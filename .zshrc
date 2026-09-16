@@ -37,6 +37,7 @@ alias uz="cp .zshrc ~/.zshrc && source ~/.zshrc && gv && echo 'zshrc updated, so
 alias cl="clear"
 alias cr="clear && cargo run"
 alias cw="cd workspace"
+alias ci="cd ~/workspace/iantalabs"
 alias tl="tree -L 1"
 alias tl2="tree -L 2"
 alias tl3="tree -L 3"
