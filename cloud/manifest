@@ -50,3 +50,7 @@ md
 mf
 cmdi
 sed-section
+
+# session logger — records commands AND output for a whole lab,
+# then packs it to carry back to M16/STD. See logger/README.md
+logger/slog

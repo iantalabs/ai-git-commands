@@ -1,0 +1,121 @@
+#!/bin/sh
+# slog-split — turn a slog session into a per-step lab reference. Runs on M16/STD.
+#
+#   slog-split ~/Downloads/gke-20260918-081233.tgz
+#   slog-split <session-dir>
+#   slog-split <session> --tasks tasks.txt     # titles pasted from the lab page
+#   slog-split <session> --commands-only       # just the commands, no output
+#
+# Writes <session>.md next to the session.
+#
+# Two ways a log gets split into steps, in order of reliability:
+#
+#   1. Markers you stamped during the session with `slog mark "Task 3: ..."`.
+#      Exact, because you placed them.
+#   2. A tasks file: one lab task title per line, pasted off the lab page. Used
+#      to NAME segments when you marked, and to number them when you did not.
+#
+# If you neither marked nor supplied tasks, the whole session comes out as one
+# section — still useful, just not split.
+set -eu
+
+MARK='###SI-STEP###'
+TASKS=""; ONLYCMD=0; SRC=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tasks) TASKS="${2:?--tasks needs a file}"; shift 2 ;;
+    --commands-only) ONLYCMD=1; shift ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) SRC="$1"; shift ;;
+  esac
+done
+[ -n "$SRC" ] || { echo "slog-split: need a session dir or .tgz" >&2; exit 1; }
+
+WORK=""
+cleanup(){ [ -n "$WORK" ] && rm -rf "$WORK"; }
+trap cleanup EXIT
+
+case "$SRC" in
+  *.tgz|*.tar.gz)
+    WORK="$(mktemp -d)"
+    LC_ALL=C tar -xzf "$SRC" -C "$WORK"
+    DIR="$(find "$WORK" -maxdepth 1 -mindepth 1 -type d | head -1)"
+    OUT="$(dirname "$SRC")/$(basename "$DIR").md"
+    ;;
+  *)
+    DIR="$SRC"; OUT="${DIR%/}.md" ;;
+esac
+[ -d "$DIR" ] || { echo "slog-split: not a session: $SRC" >&2; exit 1; }
+[ -f "$DIR/transcript.log" ] || { echo "slog-split: no transcript.log in $DIR" >&2; exit 1; }
+
+SESS="$(basename "$DIR")"
+get_meta(){ grep "^$1=" "$DIR/meta" 2>/dev/null | head -1 | cut -d= -f2- ; }
+
+{
+  echo "# $SESS"
+  echo
+  echo "| | |"
+  echo "|---|---|"
+  echo "| started | $(get_meta started) |"
+  echo "| ended | $(get_meta ended) |"
+  echo "| host | $(get_meta host) |"
+  [ -n "$(get_meta project)" ] && echo "| project | $(get_meta project) |"
+  echo "| commands | $(grep -cv "	MARK	" "$DIR/commands.tsv" 2>/dev/null || echo 0) |"
+  nfail=$(awk -F'\t' '$2 ~ /^[0-9]+$/ && $2 != 0' "$DIR/commands.tsv" 2>/dev/null | wc -l | tr -d ' ')
+  echo "| non-zero exits | $nfail |"
+  echo
+
+  if [ -n "$TASKS" ] && [ -f "$TASKS" ]; then
+    echo "## Lab tasks"
+    echo
+    n=0
+    while IFS= read -r t; do
+      [ -n "$t" ] || continue
+      n=$((n+1)); printf '%s. %s\n' "$n" "$t"
+    done < "$TASKS"
+    echo
+  fi
+
+  echo "## Commands"
+  echo
+  echo "Every command in order, with its exit status. This is the quick reference."
+  echo
+  echo '```'
+  awk -F'\t' -v m="$MARK" '
+    $2=="MARK" { sub("^" m " ", "", $3); printf "\n# ---- %s ----\n", $3; next }
+    { printf "%s%s\n", ($2=="0" ? "" : "[exit " $2 "] "), $3 }
+  ' "$DIR/commands.tsv"
+  echo '```'
+  echo
+
+  if [ "$ONLYCMD" = 1 ]; then exit 0; fi
+
+  echo "## Transcript by step"
+  echo
+
+  if grep -q "$MARK" "$DIR/transcript.log"; then
+    awk -v m="$MARK" '
+      BEGIN{ n=0; open=0 }
+      index($0,m){
+        if(open){ print "```"; print "" }
+        line=$0; sub(".*"m" ","",line)
+        sub(/^[0-9TZ:.-]+ \| /,"",line)
+        n++; printf "### %d. %s\n\n```text\n", n, line
+        open=1; next
+      }
+      { if(!open){ printf "### 0. Before the first mark\n\n```text\n"; open=1 } print }
+      END{ if(open) print "```" }
+    ' "$DIR/transcript.log"
+  else
+    echo "_No \`slog mark\` calls in this session, so it is not split into steps._"
+    echo "_Next time, run \`slog mark \"Task 1: ...\"\` as you start each lab task._"
+    echo
+    echo '```text'
+    cat "$DIR/transcript.log"
+    echo '```'
+  fi
+} > "$OUT"
+
+echo "slog-split: wrote $OUT"
+grep -c '^### ' "$OUT" 2>/dev/null | sed 's/^/  steps: /' || true

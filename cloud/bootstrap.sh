@@ -81,9 +81,10 @@ while read -r line; do
   f="$SRC/$line"
   if [ ! -f "$f" ]; then note MISSING "$line (not in the repo)"; continue; fi
   n=$((n + 1))
-  t="$HOME/bin/$line"
-  if [ ! -e "$t" ]; then note install "~/bin/$line"; changed=1
-  elif ! cmp -s "$f" "$t"; then note update "~/bin/$line"; changed=1
+  b="$(basename "$line")"          # manifest entries may carry a path (logger/slog)
+  t="$HOME/bin/$b"
+  if [ ! -e "$t" ]; then note install "~/bin/$b"; changed=1
+  elif ! cmp -s "$f" "$t"; then note update "~/bin/$b"; changed=1
   else continue
   fi
   [ "$DRY" = 1 ] || { cp "$f" "$t" && chmod 755 "$t"; }

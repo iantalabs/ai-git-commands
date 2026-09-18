@@ -1,0 +1,184 @@
+#!/bin/sh
+# slog — terminal session logger for Cloud Skills Boost / Qwiklabs VMs.
+#
+# Records the whole terminal session (commands AND their output) plus an exact
+# command list, so a lab's worth of work can be carried back to M16/STD without
+# copy-pasting scrollback.
+#
+#   slog start [name]      begin recording; drops you in a subshell
+#   slog mark "Task 3: …"  stamp a step boundary INTO the log (use as you go)
+#   exit                   ends the recording
+#   slog ls                list sessions
+#   slog clean [session]   strip ANSI -> transcript.log (automatic on exit)
+#   slog push [session]    get it off the VM (see PUSH below)
+#
+# Why both a transcript and a command list: splitting a raw transcript into
+# steps later means guessing where the prompt ends and output begins, and lab
+# prompts vary per image. The PROMPT_COMMAND hook records each command and its
+# exit status exactly, so slog-split never has to parse a prompt.
+#
+# POSIX sh: /bin/sh is dash on the lab images.
+set -eu
+
+LOGROOT="${SI_LOG_ROOT:-$HOME/si-logs}"
+MARK='###SI-STEP###'
+
+die(){ printf 'slog: %s\n' "$*" >&2; exit 1; }
+
+# util-linux (Linux) and BSD (macOS) script take their arguments differently.
+# This is the one real portability fork in the file.
+script_flavour(){
+  if script --version 2>/dev/null | grep -qi util-linux; then echo util-linux; else echo bsd; fi
+}
+
+clean_to_log(){ # raw -> log
+  perl -pe '
+    s/\e\][^\a]*\a//g;          # OSC (window titles)
+    s/\e\[[0-9;?]*[ -\/]*[\@-~]//g;  # CSI (colour, cursor)
+    s/\e[=>NM]//g;              # misc escapes
+    s/\r\n/\n/g;                # script writes CRLF
+    s/^.*\r(?!\n)//;            # collapse progress-bar overwrites
+    s/^[\x00-\x08\x0b\x0c\x0e-\x1f]+//;
+  ' "$1" > "$2"
+}
+
+cmd_start(){
+  name="${1:-lab}"
+  name=$(printf '%s' "$name" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-//; s/-$//')
+  sess="${name}-$(date +%Y%m%d-%H%M%S)"
+  dir="$LOGROOT/$sess"
+  mkdir -p "$dir"
+
+  { echo "session=$sess"
+    echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "host=$(hostname)"
+    echo "user=$(id -un)"
+    echo "project=${GOOGLE_CLOUD_PROJECT:-${DEVSHELL_PROJECT_ID:-}}"
+    echo "cloudshell=${CLOUD_SHELL:-false}"
+  } > "$dir/meta"
+
+  : > "$dir/commands.tsv"
+  ln -snf "$dir" "$LOGROOT/current"
+
+  RC="$dir/rc"
+  cat > "$RC" <<RC_EOF
+# transient rc for this slog session
+[ -r /etc/bash.bashrc ] && . /etc/bash.bashrc
+[ -r "\$HOME/.bashrc" ] && . "\$HOME/.bashrc"
+export SI_LOG_DIR="$dir"
+export SI_LOG_SESSION="$sess"
+export PS1="[slog:$name] \${PS1:-\\w\\\$ }"
+si_log_cmd(){
+  si_st=\$?
+  si_last=\$(HISTTIMEFORMAT= history 1 2>/dev/null | sed 's/^ *[0-9][0-9]* *//')
+  # slog's own bookkeeping is not lab work, and `mark` already wrote its entry.
+  case "\$si_last" in slog\ *|slog) si_last="" ;; esac
+  # A multi-line command (heredoc, pasted yaml) would otherwise break the TSV.
+  # Join to one record with a visible \\n; the transcript keeps full fidelity.
+  si_last=\$(printf '%s' "\$si_last" | awk 'BEGIN{ORS=""} NR>1{print "\\\\n"} {print}')
+  # The first hook call fires before you type anything, and by then bash HAS
+  # loaded ~/.bash_history -- so it would record the last command of your
+  # PREVIOUS session as if it belonged to this one. Priming at rc time does not
+  # work (history loads after the rc runs), so swallow call #1 instead.
+  SI_HOOK_N=\$(( \${SI_HOOK_N:-0} + 1 ))
+  if [ "\$SI_HOOK_N" -le 1 ]; then SI_LAST_SEEN="\$si_last"; return; fi
+  if [ -n "\$si_last" ] && [ "\$si_last" != "\${SI_LAST_SEEN:-}" ]; then
+    printf '%s\t%s\t%s\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" "\$si_st" "\$si_last" \\
+      >> "\$SI_LOG_DIR/commands.tsv"
+    SI_LAST_SEEN="\$si_last"
+  fi
+}
+PROMPT_COMMAND="si_log_cmd\${PROMPT_COMMAND:+; \$PROMPT_COMMAND}"
+echo "slog: recording -> $dir"
+echo "slog: 'slog mark \\"Task 1: ...\\"' to stamp a step, 'exit' to stop."
+RC_EOF
+
+  echo "slog: session $sess"
+  if [ "$(script_flavour)" = util-linux ]; then
+    script -q -c "bash --rcfile '$RC' -i" "$dir/transcript.raw" || true
+  else
+    script -q "$dir/transcript.raw" bash --rcfile "$RC" -i || true
+  fi
+
+  echo "ended=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$dir/meta"
+  clean_to_log "$dir/transcript.raw" "$dir/transcript.log"
+  printf 'slog: stopped. %s lines, %s commands.\n' \
+    "$(wc -l < "$dir/transcript.log" | tr -d ' ')" \
+    "$(wc -l < "$dir/commands.tsv" | tr -d ' ')"
+  echo "slog: next -> slog push $sess"
+}
+
+cmd_mark(){
+  [ $# -gt 0 ] || die 'mark needs text, e.g. slog mark "Task 3: create the cluster"'
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  # Printed to the terminal, so `script` captures it in the transcript.
+  printf '\n%s %s | %s\n\n' "$MARK" "$ts" "$*"
+  # Also recorded in the command list, so a split works from either artifact.
+  if [ -n "${SI_LOG_DIR:-}" ] && [ -d "$SI_LOG_DIR" ]; then
+    printf '%s\t%s\t%s %s\n' "$ts" "MARK" "$MARK" "$*" >> "$SI_LOG_DIR/commands.tsv"
+  fi
+}
+
+cmd_ls(){
+  [ -d "$LOGROOT" ] || { echo "slog: no sessions yet ($LOGROOT)"; return 0; }
+  for d in "$LOGROOT"/*/; do
+    [ -d "$d" ] || continue
+    s=$(basename "$d")
+    [ "$s" = current ] && continue
+    n=0; [ -f "$d/commands.tsv" ] && n=$(wc -l < "$d/commands.tsv" | tr -d ' ')
+    m=0; [ -f "$d/commands.tsv" ] && m=$(grep -c "	MARK	" "$d/commands.tsv" 2>/dev/null || true)
+    sz=$(du -sh "$d" 2>/dev/null | cut -f1)
+    printf '  %-34s %4s cmds  %2s marks  %s\n' "$s" "$n" "$m" "$sz"
+  done
+}
+
+resolve(){ # session name -> dir
+  s="${1:-}"
+  if [ -z "$s" ]; then
+    [ -L "$LOGROOT/current" ] || die "no session given and no current session"
+    (cd "$LOGROOT/current" && pwd -P)
+  else
+    [ -d "$LOGROOT/$s" ] || die "no such session: $s"
+    echo "$LOGROOT/$s"
+  fi
+}
+
+cmd_clean(){ d=$(resolve "${1:-}"); clean_to_log "$d/transcript.raw" "$d/transcript.log"
+  echo "slog: cleaned -> $d/transcript.log"; }
+
+cmd_push(){
+  d=$(resolve "${1:-}"); s=$(basename "$d")
+  [ -f "$d/transcript.log" ] || clean_to_log "$d/transcript.raw" "$d/transcript.log"
+  tgz="$LOGROOT/$s.tgz"
+  ( cd "$LOGROOT" && LC_ALL=C tar -czf "$tgz" "$s" )
+  echo "slog: packed $tgz ($(du -h "$tgz" | cut -f1))"
+  echo
+  if [ "${CLOUD_SHELL:-}" = true ] || [ -n "${DEVSHELL_PROJECT_ID:-}" ]; then
+    echo "  Cloud Shell detected — downloading to your browser's machine:"
+    echo "    cloudshell download $tgz"
+    if command -v cloudshell >/dev/null 2>&1; then cloudshell download "$tgz" || true; fi
+  else
+    echo "  Not Cloud Shell. This box is probably a lab GCE VM, so hop via Cloud Shell:"
+    echo
+    echo "    # run these IN CLOUD SHELL, not here:"
+    echo "    gcloud compute scp --zone \"\$ZONE\" $(id -un)@$(hostname):$tgz ."
+    echo "    cloudshell download $(basename "$tgz")"
+    echo
+    echo "  No credentials leave the lab, and nothing goes to a third party."
+  fi
+  echo
+  echo "  Then on M16/STD:  slog-split ~/Downloads/$(basename "$tgz")"
+}
+
+usage(){ sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+
+case "${1:-}" in
+  start) shift; cmd_start "${1:-lab}" ;;
+  mark)  shift; cmd_mark "$@" ;;
+  ls|list) cmd_ls ;;
+  clean) shift; cmd_clean "${1:-}" ;;
+  push)  shift; cmd_push "${1:-}" ;;
+  stop)  echo "slog: type 'exit' to end the recording subshell" ;;
+  ''|-h|--help|help) usage ;;
+  *) die "unknown subcommand: $1 (try: slog --help)" ;;
+esac

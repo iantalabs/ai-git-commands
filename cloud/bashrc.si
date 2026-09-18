@@ -35,6 +35,10 @@ alias gke="gcloud container clusters get-credentials"
 
 alias tf="terraform"
 
+# session logger (logger/README.md): slog start <lab> / slog mark "Task 2: ..." / exit
+alias sls="slog ls"
+alias slm="slog mark"
+
 # md and mf as functions so md can cd in THIS shell and mf picks up $EDITOR.
 # ~/bin/md and ~/bin/mf exist too; a function takes precedence over PATH.
 md() { test -d "$1" || mkdir -p "$1"; cd "$1"; }
