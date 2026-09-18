@@ -62,11 +62,27 @@ _tl() {
   ( cd "$d" 2>/dev/null || { print -u2 "tl: no such directory: $d"; return 1; }
     echo "$d"
     find . -mindepth 1 -maxdepth "$n" \( -name '.*' -prune \) -o -print \
-      | LC_ALL=C sort \
-      | sed -e 's|^\./||' -e 's|[^/]*/|    |g' -e 's|^|  |'
+      | sed 's|^\./||' | LC_ALL=C sort | awk '
+      { p[NR]=$0 }
+      END{
+        for(i=1;i<=NR;i++){
+          d=split(p[i],a,"/")
+          par=(d>1)?substr(p[i],1,length(p[i])-length(a[d])-1):""
+          last=1
+          for(j=i+1;j<=NR;j++){
+            dq=split(p[j],b,"/")
+            if(dq<d) break
+            parq=(dq>1)?substr(p[j],1,length(p[j])-length(b[dq])-1):""
+            if(dq==d){ if(parq==par) last=0; break }
+          }
+          L[d]=last; pre=""
+          for(k=1;k<d;k++) pre=pre (L[k]?"    ":"\342\224\202   ")
+          print pre (last?"\342\224\224\342\224\200\342\224\200 ":"\342\224\234\342\224\200\342\224\200 ") a[d]
+        }
+      }'
     nd=$(find . -mindepth 1 -maxdepth "$n" \( -name '.*' -prune \) -o -type d -print | wc -l | tr -d ' ')
     nf=$(find . -mindepth 1 -maxdepth "$n" \( -name '.*' -prune \) -o -type f -print | wc -l | tr -d ' ')
-    printf '\n%s dirs, %s files\n' "$nd" "$nf"
+    printf '\n%s directories, %s files\n' "$nd" "$nf"
   )
 }
 tl()  { _tl 1 "$@"; }
