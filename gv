@@ -3,7 +3,15 @@
 # git status > git add . > git status > git commit + UTCms
 
 tmp=`pbpaste`
-utc=`gdate +%s%3N`
+
+# gdate is GNU coreutils via brew and is NOT on every machine (the mini has no
+# brew coreutils). BSD date has no %N, so fall back to whole seconds padded out
+# to milliseconds — same width, same sort order, 000 in the last three digits.
+if command -v gdate >/dev/null 2>&1; then
+  utc=`gdate +%s%3N`
+else
+  utc="`date +%s`000"
+fi
 
 echo git commit local: gs ga gs gc 
 echo ---
@@ -14,7 +22,7 @@ ga
 
 gs
 
-echo git commit -am \'SI @$(gdate +%s%3N) ms + $(pbpaste)\'
+echo git commit -am \'SI @$utc ms + $tmp\'
 
 git commit -am "SI @$utc ms + $tmp"
 

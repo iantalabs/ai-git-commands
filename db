@@ -1,10 +1,9 @@
 #!/bin/sh
 # db - shortcut for docker build command
 # first arg is the image tag
-# config param: dockerUser: eg: stefian
+# Registry/user prefix comes from $DOCKER_USER, default stefian22. Set it per
+# environment: DOCKER_USER=gcr.io/$GOOGLE_CLOUD_PROJECT in a GCP lab.
 
-args=("$@")
+echo docker build -t "${DOCKER_USER:-stefian22}/$1" .
 
-echo docker build -t stefian22/"${args[0]}" .
-
-docker build -t stefian22/"${args[0]}" .
+docker build -t "${DOCKER_USER:-stefian22}/$1" .

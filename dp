@@ -1,10 +1,9 @@
 #!/bin/sh
 # dp - shortcut for docker push
 # first arg is the container name/tag
-# config param: dockerUser: eg: stefian
+# Registry/user prefix comes from $DOCKER_USER, default stefian22. Set it per
+# environment: DOCKER_USER=gcr.io/$GOOGLE_CLOUD_PROJECT in a GCP lab.
 
-args=("$@")
+echo docker push "${DOCKER_USER:-stefian22}/$1"
 
-echo docker push stefian22/"${args[0]}"
-
-docker push stefian22/"${args[0]}"
+docker push "${DOCKER_USER:-stefian22}/$1"

@@ -1,11 +1,21 @@
 #!/bin/sh
 # command install
 # first arg is the cmd file
+#
+# Installs into $CMDI_DEST, default /usr/local/bin. The mini sets
+# CMDI_DEST=$HOME/bin in .zshenv: no sudo needed, and the root LaunchDaemon that
+# runs the nightly backup does not inherit these commands on its PATH.
+# sudo is used only when the destination is not writable as you.
 
-args=("$@")
+dest="${CMDI_DEST:-/usr/local/bin}"
 
-echo sudo cp "${args[0]}" /usr/local/bin
+if [ -w "$dest" ]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
 
-sudo cp "${args[0]}" /usr/local/bin
-sudo chmod +x /usr/local/bin/"${args[0]}"
+echo $SUDO cp "$1" "$dest"
 
+$SUDO cp "$1" "$dest" || exit 1
+$SUDO chmod +x "$dest"/"$1"

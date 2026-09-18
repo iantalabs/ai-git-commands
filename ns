@@ -1,3 +1,4 @@
+#!/bin/sh
 # ns - shortcut for npm start command
 
 echo npm start

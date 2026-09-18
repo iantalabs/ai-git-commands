@@ -2,8 +2,6 @@
 # ke - shortcut for docker exec cmd in pod
 # first arg is podName, second arg is the cmd
 
-args=("$@")
+echo kubectl exec -it "$1" "$2"
 
-echo kubectl exec -it "${args[0]}" "${args[1]}"
-
-kubectl exec -it "${args[0]}" "${args[1]}"
+kubectl exec -it "$1" "$2"

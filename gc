@@ -1,6 +1,5 @@
+#!/bin/sh
 # gc - shortcut for git commit command
 # first arg is the commit -am message
 
-args=("$@")
-
-git commit -am "${args[0]}"
+git commit -am "$1"

@@ -1,3 +1,4 @@
+#!/bin/sh
 # fd - shortcut for firebase deploy
 echo firebase deploy
 

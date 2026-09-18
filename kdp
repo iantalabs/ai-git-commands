@@ -2,8 +2,6 @@
 # kdp - shortcut for kubectl delete pod podName
 # first arg is the podName
 
-args=("$@")
+echo kubectl delete pod "$1" 
 
-echo kubectl delete pod "${args[0]}" 
-
-kubectl delete pod "${args[0]}" 
+kubectl delete pod "$1" 

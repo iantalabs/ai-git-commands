@@ -2,8 +2,6 @@
 # kl - shortcut for kubectl logs podName
 # first arg is the podName
 
-args=("$@")
+echo kubectl logs "$1" 
 
-echo kubectl logs "${args[0]}" 
-
-kubectl logs "${args[0]}" 
+kubectl logs "$1" 

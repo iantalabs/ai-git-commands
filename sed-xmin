@@ -3,8 +3,6 @@
 # first arg is the initial file, second arg is the new file
 # eg: sed 's/\n(\d+)min\n/` $1min`/g' UX-design-theory.txt > ux-design.txt
 
-args=("$@")
+echo sed 's/\n(\d+)min\n/` $1min`/g' "$1" > "$2"
 
-echo sed 's/\n(\d+)min\n/` $1min`/g' "${args[0]}" > "${args[1]}"
-
-sed 's/\n(\d+)min\n/` $1min`/g' "${args[0]}" > "${args[1]}"
+sed 's/\n(\d+)min\n/` $1min`/g' "$1" > "$2"

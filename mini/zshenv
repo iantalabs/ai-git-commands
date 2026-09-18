@@ -1,0 +1,31 @@
+# si-shortcuts — environment for EVERY zsh on this machine, including
+# `ssh mini '<cmd>'`.
+#
+# Why this file and not .zshrc:
+#   .zshenv   every zsh          <- non-interactive `ssh mini 'gs'` reads ONLY this
+#   .zprofile login shells
+#   .zshrc    interactive shells <- `ssh mini` then typing `gs` reads this too
+#
+# So anything that must work over `ssh mini '<cmd>'` is a script in ~/bin plus a
+# PATH entry here. An alias cannot do it — see mini/zshrc.si.
+
+typeset -U path                       # dedupe; nested shells re-read this file
+
+# ~/bin           the short commands (mini/install.sh puts them there)
+# /usr/local/bin  docker lives here as a symlink into Docker.app, and it is NOT on
+#                 the default non-interactive PATH, which is exactly
+#                 /usr/bin:/bin:/usr/sbin:/sbin. That is why
+#                 family-server-ops/ops/preflight.sh has to `export PATH=...` by
+#                 hand inside its remote heredoc. With this line, `ssh mini
+#                 'docker ps'` works and that export becomes belt-and-braces
+#                 rather than the only thing holding it up.
+path=( "$HOME/bin" /usr/local/bin $path )
+export PATH
+
+# mf opens ${EDITOR:-code}; there is no VS Code here.
+export EDITOR="${EDITOR:-nano}"
+
+# cmdi installs here instead of /usr/local/bin. No sudo, and the root-owned
+# LaunchDaemon that runs the nightly Matrix backup does not silently gain 15 new
+# two-letter commands on its PATH.
+export CMDI_DEST="$HOME/bin"

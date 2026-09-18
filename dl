@@ -2,8 +2,6 @@
 # dl - shortcut for docker logs containerId
 # first arg is the container id
 
-args=("$@")
+echo docker logs "$1" 
 
-echo docker logs "${args[0]}" 
-
-docker logs "${args[0]}" 
+docker logs "$1" 

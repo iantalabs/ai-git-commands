@@ -1,0 +1,80 @@
+# si-shortcuts — interactive aliases and functions.
+#
+# MANAGED FILE. mini/install.sh overwrites it wholesale on every run; put local
+# edits in ~/.zshrc instead, below the source line.
+#
+# Everything here is interactive-only. `ssh mini 'cl'` will NOT find these —
+# a non-interactive zsh never reads .zshrc. Scripts in ~/bin are what works
+# over ssh; see mini/zshenv.
+
+alias cl="clear"
+alias x="exit"
+alias la="ls -la"
+# NOTE: no `alias ls="lsd"` here. lsd is not installed on the mini, and aliasing
+# ls to a missing binary breaks every listing — including the ones you type while
+# recovering from something else at 2am.
+
+alias za="grep -E '^\s*alias\b' ~/.zshrc.si | sort | cat -n"
+alias sz="source ~/.zshrc"
+alias nz="nano ~/.zshrc"          # your file
+alias nzs="nano ~/.zshrc.si"      # this one — managed, reinstall overwrites it
+
+alias p3="python3"
+alias python="python3"
+
+alias dps="docker ps"
+alias dpsa="docker ps -a"
+alias dpsn="docker ps --format '{{.Names}} | {{.Status}}'"   # the cmds.md health line
+
+alias hsd="hugo server --disableFastRender"                  # hugo is in ~/bin
+
+alias green="echo -e '\e]11;#044\a'"
+alias blue="echo -e '\e]11;#036\a'"
+alias grey="echo -e '\e]11;#181818\a'"
+
+# Navigation — mini1's home, not /Users/stefan/workspace. The Mac's cw/ci/cj
+# point at paths that do not exist here.
+alias cw="cd ~/workspace"
+alias cb="cd ~/bin"
+alias cm="cd ~/monitor"
+alias cww="cd ~/www"
+alias cj="cd ~/vsc-jobs"
+
+# kubectl is installed at /usr/local/bin/kubectl — it only looked missing before
+# .zshenv put /usr/local/bin on the non-interactive PATH.
+alias k="kubectl"
+alias kd="kubectl get deployments"
+alias ks="kubectl get services"
+alias kn="kubectl get nodes"
+
+# tl / tl2 / tl3 — directory tree to depth 1, 2, 3.
+#
+# The Mac aliases these to `tree -L n`, but there is no tree on this machine and
+# `brew install tree` on a 2012 mini running a production Matrix server is not
+# worth it for a listing. These use tree when it IS present and otherwise fall
+# back to find, which ships with macOS. Same command name either way.
+_tl() {
+  n="$1"; shift; d="${1:-.}"
+  if command -v tree >/dev/null 2>&1; then
+    tree -L "$n" "$d"
+    return
+  fi
+  ( cd "$d" 2>/dev/null || { print -u2 "tl: no such directory: $d"; return 1; }
+    echo "$d"
+    find . -mindepth 1 -maxdepth "$n" \( -name '.*' -prune \) -o -print \
+      | LC_ALL=C sort \
+      | sed -e 's|^\./||' -e 's|[^/]*/|    |g' -e 's|^|  |'
+    nd=$(find . -mindepth 1 -maxdepth "$n" \( -name '.*' -prune \) -o -type d -print | wc -l | tr -d ' ')
+    nf=$(find . -mindepth 1 -maxdepth "$n" \( -name '.*' -prune \) -o -type f -print | wc -l | tr -d ' ')
+    printf '\n%s dirs, %s files\n' "$nd" "$nf"
+  )
+}
+tl()  { _tl 1 "$@"; }
+tl2() { _tl 2 "$@"; }
+tl3() { _tl 3 "$@"; }
+
+# md and mf are functions here so they can affect THIS shell (cd) and pick up
+# $EDITOR. ~/bin/md and ~/bin/mf exist as well, for `ssh mini 'md foo'`; a
+# function takes precedence over PATH, so interactively these win.
+md() { test -d "$1" || mkdir -p "$1"; cd "$1"; }
+mf() { touch "$1" && ${EDITOR:-nano} "$1"; }

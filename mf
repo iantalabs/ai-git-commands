@@ -1,7 +1,7 @@
 #!/bin/sh
-# md - shortcut for make file < fileName >
+# mf - shortcut for make file < fileName > and open it
 # first arg is the file Name
+# EDITOR wins where it is set (the mini sets it to nano in .zshenv); falls back
+# to VS Code, which is what this did unconditionally before.
 
-args=("$@")
-
-touch "${args[0]}"
+touch "$1" && ${EDITOR:-code} "$1"

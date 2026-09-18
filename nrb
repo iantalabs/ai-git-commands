@@ -1,3 +1,4 @@
+#!/bin/sh
 # nrb - shortcut for npm run build
 echo npm run build
 

@@ -1,3 +1,4 @@
+#!/bin/sh
 # ga - shortcut for git add . command
 
 git add .

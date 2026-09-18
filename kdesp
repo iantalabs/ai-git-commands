@@ -2,8 +2,6 @@
 # kdesp - shortcut for kubectl describe pod podName
 # first arg is the podName
 
-args=("$@")
+echo kubectl describe pod "$1" 
 
-echo kubectl describe pod "${args[0]}" 
-
-kubectl describe pod "${args[0]}" 
+kubectl describe pod "$1" 

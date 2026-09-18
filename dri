@@ -2,8 +2,6 @@
 # dri - shortcut for docker run interactive
 # first arg is the image tag/id, second arg is the cmd
 
-args=("$@")
+echo docker run -it "$1" "$2"
 
-echo docker run -it "${args[0]}" "${args[1]}"
-
-docker run -it "${args[0]}" "${args[1]}"
+docker run -it "$1" "$2"

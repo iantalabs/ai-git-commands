@@ -1,3 +1,4 @@
+#!/bin/sh
 # gl - shortcut for git log command
 
 git log

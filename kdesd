@@ -2,8 +2,6 @@
 # kdesd - shortcut for kubectl describe deployment deplName
 # first arg is the deplName
 
-args=("$@")
+echo kubectl describe deployment "$1" 
 
-echo kubectl describe deployment "${args[0]}" 
-
-kubectl describe deployment "${args[0]}" 
+kubectl describe deployment "$1" 

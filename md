@@ -2,6 +2,4 @@
 # md - shortcut for makedir < dirName >
 # first arg is the dirName
 
-args=("$@")
-
-mkdir "${args[0]}"
+mkdir "$1"

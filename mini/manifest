@@ -1,0 +1,53 @@
+# mini/manifest — which short commands get installed into ~/bin on the mini.
+#
+# One name per line, resolved against the repo root. Blank lines and # comments
+# are ignored. The install copies these and nothing else, on purpose: a shortcut
+# for a runtime the mini does not have is not a shortcut, it is a broken command
+# that fails at the moment you reach for it.
+#
+# Deliberately NOT here, and why:
+#   ns nrs nrb                                 no node/npm
+#   fd fdr                                     no firebase CLI
+#   hc hcg                                     no `hub`, and the mini creates no repos
+#   db dp                                      docker build/push to stefian22 — the
+#                                              mini consumes images, it does not publish
+#   dev4 si-nvim-startup                       no tmux, no nvim
+#   rifa rifu                                  need `replace-in-files` (npm)
+#   sed-xmin                                   README marks it "Not Tested !!" and its
+#                                              sed script is BRE-invalid — shipping a
+#                                              known-broken command helps nobody
+
+# git — /usr/bin/git, present
+ga
+gc
+gl
+gp
+gs
+gv
+gx
+
+# docker — /usr/local/bin/docker -> Docker.app, present
+de
+dl
+dr
+dri
+
+# kubernetes — kubectl IS installed at /usr/local/bin/kubectl. It was missed in the
+# first survey, which ran before .zshenv put /usr/local/bin on the non-interactive
+# PATH, so `command -v kubectl` came back empty. Corrected 2026-09-18.
+ka
+kp
+ke
+kl
+kdp
+kdd
+kdesp
+kdesd
+kdess
+kr
+
+# files / shell — coreutils only
+md
+mf
+cmdi
+sed-section

@@ -2,8 +2,6 @@
 # kr - shortcut for kubectl rollout restart deployment deplName
 # first arg is the deplName
 
-args=("$@")
+echo kubectl rollout restart deployment "$1" 
 
-echo kubectl rollout restart deployment "${args[0]}" 
-
-kubectl rollout restart deployment "${args[0]}" 
+kubectl rollout restart deployment "$1" 

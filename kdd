@@ -2,8 +2,6 @@
 # kdd - shortcut for kubectl delete deployment deplName
 # first arg is the deplName
 
-args=("$@")
+echo kubectl delete deployment "$1" 
 
-echo kubectl delete deployment "${args[0]}" 
-
-kubectl delete deployment "${args[0]}" 
+kubectl delete deployment "$1" 

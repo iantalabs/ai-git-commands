@@ -2,8 +2,6 @@
 # de - shortcut for docker exec cmd in container
 # first arg is the container id, second arg is the cmd
 
-args=("$@")
+echo docker exec -it "$1" "$2"
 
-echo docker exec -it "${args[0]}" "${args[1]}"
-
-docker exec -it "${args[0]}" "${args[1]}"
+docker exec -it "$1" "$2"

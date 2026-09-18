@@ -1,0 +1,52 @@
+# cloud/manifest — short commands for an ephemeral Linux VM (Qwiklabs / Google
+# Skills Boost, Cloud Shell, a scratch GCE box).
+#
+# Close to the INVERSE of mini/manifest, which is the point of keeping the list
+# in a file: the mini has no kubectl and builds no images, a GKE lab is nothing
+# but kubectl and image builds.
+#
+# Not here, and why:
+#   gv gx        need pbpaste; no clipboard on a headless Linux VM. Use gc "msg".
+#   fd fdr       firebase CLI is not in a GCP lab image
+#   hc hcg       `hub` is not installed and labs create no GitHub repos
+#   rifa rifu    need `replace-in-files` (npm global)
+#   sed-xmin     README marks it "Not Tested !!" and its sed script is BRE-invalid
+#   dev4         no tmux config to go with it
+
+# git
+ga
+gc
+gl
+gp
+gs
+
+# kubernetes — the whole point of a GKE lab
+ka
+kp
+ke
+kl
+kdp
+kdd
+kdesp
+kdesd
+kdess
+kr
+
+# docker — labs DO build and push; set DOCKER_USER (see cloud/profile)
+db
+dr
+dri
+de
+dl
+dp
+
+# node
+ns
+nrs
+nrb
+
+# files / shell
+md
+mf
+cmdi
+sed-section

@@ -1,0 +1,41 @@
+# si-shortcuts — interactive aliases for a Linux VM. Sourced from ~/.bashrc.
+#
+# MANAGED FILE. cloud/bootstrap.sh overwrites it on every run.
+#
+# Interactive-only, like on the mini: `ssh vm 'cl'` will not find these.
+# Scripts in ~/bin are what work non-interactively.
+
+alias cl="clear"
+alias x="exit"
+alias la="ls -la"
+alias ll="ls -l"
+# No `alias ls=lsd` — lsd is not on a lab image.
+
+alias za="grep -E '^\s*alias\b' ~/.bashrc.si | sort | cat -n"
+alias sz="source ~/.bashrc"
+alias nz="\${EDITOR:-nano} ~/.bashrc"
+alias nzs="\${EDITOR:-nano} ~/.bashrc.si"   # managed — reinstall overwrites it
+
+alias p3="python3"
+
+alias dps="docker ps"
+alias dpsa="docker ps -a"
+
+alias k="kubectl"
+alias kd="kubectl get deployments"
+alias ks="kubectl get services"
+alias kn="kubectl get nodes"
+alias kga="kubectl get all"
+
+# gcloud — the shortcuts a lab actually spends its time on
+alias gcp="gcloud config list project"
+alias gcl="gcloud config list"
+alias gcz="gcloud config get-value compute/zone"
+alias gke="gcloud container clusters get-credentials"
+
+alias tf="terraform"
+
+# md and mf as functions so md can cd in THIS shell and mf picks up $EDITOR.
+# ~/bin/md and ~/bin/mf exist too; a function takes precedence over PATH.
+md() { test -d "$1" || mkdir -p "$1"; cd "$1"; }
+mf() { touch "$1" && ${EDITOR:-nano} "$1"; }

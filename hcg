@@ -1,9 +1,9 @@
+#!/bin/sh
 # hcg - shortcut for hub create github live-ai/repo for Google Cloud project
 # first arg is org-name/repo-name
 # other optional args -d description, -h url
 # hub create -d Description -h example.com org_name/foo_repo
 
-args=("$@")
-echo hub create live-ai/"${args[0]}" -d "${args[0]}" web app -h https://"${args[0]}".web.app 
+echo hub create live-ai/"$1" -d "$1" web app -h https://"$1".web.app 
 
-hub create live-ai/"${args[0]}" -d "${args[0]}" web app -h https://"${args[0]}".web.app 
+hub create live-ai/"$1" -d "$1" web app -h https://"$1".web.app 

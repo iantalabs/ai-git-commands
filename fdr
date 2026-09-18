@@ -1,3 +1,4 @@
+#!/bin/sh
 # Firebase Deploy & Resume
 echo firebase deploy and resume coding
 echo mnemo: Franklin Delano Roosevelt
