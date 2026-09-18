@@ -4,7 +4,7 @@
 # The mini is a known host you PUSH to over ssh. A lab VM is anonymous, timed and
 # unreachable from your laptop, so it has to PULL. One line, from the VM:
 #
-#   curl -fsSL https://raw.githubusercontent.com/W3AI/ai-git-commands/master/cloud/bootstrap.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/iantalabs/ai-git-commands/master/cloud/bootstrap.sh | sh
 #
 # Options (env vars, because it is usually run through a pipe):
 #   SI_REF=master        branch or tag to install from
@@ -20,7 +20,7 @@
 # parse time on any Debian box.
 set -eu
 
-REPO="W3AI/ai-git-commands"
+REPO="iantalabs/ai-git-commands"
 REF="${SI_REF:-master}"
 DRY="${SI_DRY:-0}"
 MARK_B='# >>> si-shortcuts >>>'

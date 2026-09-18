@@ -7,7 +7,7 @@ copy-pasting scrollback. Later, `slog-split` turns it into a per-task reference.
 ## In the lab
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/W3AI/ai-git-commands/master/cloud/bootstrap.sh | sh
+curl -fsSL https://raw.githubusercontent.com/iantalabs/ai-git-commands/master/cloud/bootstrap.sh | sh
 . ~/.profile
 
 slog start gke-autopilot           # begins recording, drops you in a subshell
