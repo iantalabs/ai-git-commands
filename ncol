@@ -1,0 +1,90 @@
+#!/bin/bash
+# ncol - open the ncol wall, starting it first if it is not running on this machine
+#
+#   ncol           start if needed, then open http://localhost:8080/#/ncol
+#   ncol status    is it up, and is the LaunchAgent installed
+#   ncol restart   restart the LaunchAgent (only needed after editing scripts/dev.mjs)
+#   ncol stop      stop it until next login
+#   ncol log       follow the service log
+#
+# The wall runs as the LaunchAgent org.w3ai.ncol (see the ncol README, "Or let it
+# start itself"). On a machine where it is not installed yet, `ncol` installs it,
+# so every machine ends up the same way: served from login, on :8080.
+#
+# Self-contained, so `cmdi ncol` works: nothing here depends on where this repo
+# lives. NCOL_DIR overrides where the ncol repo is; NCOL_PORT the port.
+
+repo="${NCOL_DIR:-$HOME/workspace/iantalabs/ncol}"
+port="${NCOL_PORT:-8080}"
+url="http://localhost:$port/#/ncol"
+label="org.w3ai.ncol"
+agent="$HOME/Library/LaunchAgents/$label.plist"
+logf="$HOME/Library/Logs/ncol/service.log"
+
+up()        { curl -sf -o /dev/null --max-time 2 "http://localhost:$port/"; }
+installed() { [ -e "$agent" ]; }
+loaded()    { launchctl print "gui/$UID/$label" >/dev/null 2>&1; }
+
+wait_up() {
+    # First run downloads a stock Element release before it serves, so allow time.
+    printf "[ncol] waiting for :%s " "$port"
+    for _ in $(seq 1 90); do
+        if up; then echo " up"; return 0; fi
+        printf "."; sleep 2
+    done
+    echo
+    echo "[ncol] not up after 3 minutes — last lines of $logf:" >&2
+    tail -n 15 "$logf" >&2
+    return 1
+}
+
+case "${1:-}" in
+    status)
+        up && echo "[ncol] serving on :$port" || echo "[ncol] nothing on :$port"
+        installed && echo "[ncol] LaunchAgent installed: $agent" || echo "[ncol] LaunchAgent not installed"
+        loaded && launchctl print "gui/$UID/$label" | grep -E "^\s*(state|pid|last exit code) ="
+        exit 0 ;;
+    stop)
+        launchctl bootout "gui/$UID/$label" && echo "[ncol] stopped until next login"
+        exit $? ;;
+    restart)
+        launchctl kickstart -k "gui/$UID/$label" && wait_up
+        exit $? ;;
+    log)
+        exec tail -f "$logf" ;;
+    "") ;;
+    *)
+        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        exit 1 ;;
+esac
+
+if up; then
+    echo "[ncol] already running"
+    exec open "$url"
+fi
+
+if [ ! -d "$repo" ]; then
+    echo "[ncol] no ncol repo at $repo — clone it there, or set NCOL_DIR" >&2
+    exit 1
+fi
+
+# Build here rather than leaving it to the service: a failure then lands in this
+# terminal instead of in a log file behind a restart loop.
+if [ ! -f "$repo/dist/modules/ncol.js" ]; then
+    echo "[ncol] first run on this machine — building modules"
+    (cd "$repo" && pnpm install && pnpm build) || { echo "[ncol] build failed" >&2; exit 1; }
+fi
+
+if ! installed; then
+    echo "[ncol] installing LaunchAgent $label (starts at login; 'ncol stop' to stop)"
+    mkdir -p "$(dirname "$logf")" "$(dirname "$agent")"
+    ln -sfn "$repo/deploy/$label.plist" "$agent"
+fi
+
+if loaded; then
+    launchctl kickstart "gui/$UID/$label"
+else
+    launchctl bootstrap "gui/$UID" "$agent"
+fi
+
+wait_up && open "$url"

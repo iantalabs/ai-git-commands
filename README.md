@@ -38,6 +38,7 @@
 ## devops
 
 - **fdr** / firebase deploy & resume coding (vue build > deploy > dev) / Franklin Delano Roosevelt
+- **ncol** / open the ncol wall at localhost:8080/#/ncol, starting it first if needed — installs its LaunchAgent on a new machine; `ncol status | restart | stop | log`. Install with `cmdi ncol`
 
 ## git
 
