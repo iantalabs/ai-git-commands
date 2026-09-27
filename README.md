@@ -42,6 +42,7 @@
 
 ## git
 
+- **cnp** / commit and push — typed to Claude Code (`cnp` or `/cnp`) on M16 and STD: commits this session's changes with a message drafted from the repo's todos, plan and diff, then pushes. Skill in `skills/cnp/`, symlinked to `~/.claude/skills/cnp`. Terminal version to come (ncol todo #8)
 - **gx** / gs > ga > gs > gc(cmd-v) > gp
 - **gv** / gs > ga > gs > gc(cmd-v) + UTCms
 - **ga** / git add .
