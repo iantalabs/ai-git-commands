@@ -13,6 +13,7 @@ alias o.="open ."
 alias c.="code ."
 alias gp2="/Users/stefan/workspace/git-cmds/gp2.sh"   # push to both GitHub and GitLab safely with merge-first strategy to avoid rebase ping-pong
 alias ncol="command ncol"   # ncol wall: start if needed + open localhost:8080/#/ncol; ncol status|restart|stop|log (install: cmdi ncol)
+alias std='ssh -t stefans-mac-studio /opt/homebrew/bin/tmux new -A -s m16 -c ~/workspace/iantalabs'   # M16 -> STD: attach (or start) tmux session m16 on the Studio; a window per repo, survives M16 sleeping
 alias nb="open -a 'Brave Browser' -n --args --new-window"     # start new brave browser window
 alias nrs="npm run start"
 alias hsd="hugo server --disableFastRender"

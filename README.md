@@ -39,6 +39,7 @@
 
 - **fdr** / firebase deploy & resume coding (vue build > deploy > dev) / Franklin Delano Roosevelt
 - **ncol** / open the ncol wall at localhost:8080/#/ncol, starting it first if needed — installs its LaunchAgent on a new machine; `ncol status | restart | stop | log`. Install with `cmdi ncol`
+- **std** / from M16, attach to (or start) the tmux session `m16` on STD, the Studio, over the tailnet: Claude Code sessions keep running there when M16 sleeps; a window per repo (Ctrl-b c new, n next, d detach). tmux by full path, since ssh runs it without a login shell. See aipmo `docs/working-setups.md`
 
 ## git
 
