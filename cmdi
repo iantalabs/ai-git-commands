@@ -1,6 +1,6 @@
 #!/bin/sh
 # command install
-# first arg is the cmd file
+# first arg is the cmd file, or a path to it (cmdi skills/skills installs `skills`)
 #
 # Installs into $CMDI_DEST, default /usr/local/bin. The mini sets
 # CMDI_DEST=$HOME/bin in .zshenv: no sudo needed, and the root LaunchDaemon that
@@ -17,5 +17,7 @@ fi
 
 echo $SUDO cp "$1" "$dest"
 
+# A command may live in a subdirectory (skills/skills, beside the skills/ that holds
+# Claude skills), so it is installed under its basename.
 $SUDO cp "$1" "$dest" || exit 1
-$SUDO chmod +x "$dest"/"$1"
+$SUDO chmod +x "$dest"/"$(basename "$1")"

@@ -46,6 +46,7 @@
 ## git
 
 - **cnp** / commit and push — typed to Claude Code (`cnp` or `/cnp`) on M16 and STD: commits this session's changes with a message drafted from the repo's todos, plan and diff, then pushes. Skill in `skills/cnp/`, symlinked to `~/.claude/skills/cnp`. Terminal version to come (ncol todo #8)
+- **skills** / list Claude Code's /commands and skills in alphabetical order, numbered, one line each: name, where it comes from (`user:<repo>` for a symlinked skill, so you know where to edit it; `claude.ai`; or the current repo), and the first sentence of its description. Like `za` for aliases. `skills <word>` filters. Reads only `~/.claude` and the repo you're in, bash 3.2 + awk, so the same file works on STD and M16. Lives at `skills/skills` (the `skills/` dir holds the Claude skills themselves); install with `cmdi skills/skills`, or `CMDI_DEST=~/.local/bin ./cmdi skills/skills` without sudo
 - **gx** / gs > ga > gs > gc(cmd-v) > gp
 - **gv** / gs > ga > gs > gc(cmd-v) + UTCms
 - **ga** / git add .
@@ -66,7 +67,7 @@
 
 ## Mac install
 
-- **cmdi** / command install in /usr/local/bin
+- **cmdi** / command install in /usr/local/bin (`$CMDI_DEST` overrides); takes a path too, installed under its basename: `cmdi skills/skills` → `skills`
 
 ```bash
 cmdi < cmd >

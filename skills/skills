@@ -1,0 +1,102 @@
+#!/bin/bash
+# skills - list Claude Code's /commands and skills, sorted, one line each (like za for aliases)
+#
+#   skills          everything this machine's Claude Code can load here, numbered
+#   skills <word>   only lines containing <word> (case-insensitive), e.g. skills matrix
+#
+# Columns: /name · where it comes from · the first sentence of its description.
+#   where:  user        ~/.claude/skills or ~/.claude/commands (a symlinked skill shows
+#                       the repo it lives in, e.g. user:ncol, which is where to edit it)
+#           claude.ai   skills synced from claude.ai, invoked as anthropic-skills:<name>
+#           <repo>      the current git repo's own .claude/skills and .claude/commands
+#
+# Self-contained, so `cmdi` works: it reads only ~/.claude and the repo you are in, and
+# needs nothing beyond the bash 3.2 and awk every Mac has — the same on STD and M16.
+# Built-in commands (/help, /clear, ...) are part of Claude Code itself and not listed.
+
+filter="${1:-}"
+cols="${COLUMNS:-$(tput cols 2>/dev/null || echo 120)}"
+[ "$cols" -lt 60 ] && cols=60
+
+# name|where|description from one SKILL.md or command .md. The name is the folder (or
+# file) name, never the front matter's `name:` — Claude Code listed post.std-old (a stale copy,
+# deleted 2026-09-29) under that name though its SKILL.md said `name: post`. A description may be a
+# folded YAML block (description: >-), so the indented lines after it are joined.
+describe() {
+    local file="$1" fallback="$2" where="$3"
+    awk -v fallback="$fallback" -v where="$where" '
+        NR == 1 && $0 != "---" { body = 1 }
+        NR == 1 && $0 == "---" { fm = 1; next }
+        fm && $0 == "---" { fm = 0; body = 1; next }
+        fm && /^description:/ {
+            sub(/^description:[ \t]*/, "")
+            if ($0 ~ /^[>|]-?$/) { folding = 1; desc = "" } else { desc = $0 }
+            next
+        }
+        fm && folding && /^[ \t]+/ { sub(/^[ \t]+/, ""); desc = desc (desc ? " " : "") $0; next }
+        fm { folding = 0 }
+        body && desc == "" && /[A-Za-z]/ && !/^#/ { desc = $0; exit }
+        END {
+            gsub(/^["\x27]|["\x27]$/, "", desc)
+            # first sentence only: up to ". " or " — " (a period inside "e.g." stays put)
+            if (match(desc, /[^.]\. |[ ]—[ ]/)) desc = substr(desc, 1, RSTART)
+            sub(/[ \t]+$/, "", desc)
+            printf "%s|%s|%s\n", fallback, where, desc
+        }' "$file"
+}
+
+# Where a symlinked skill really lives, as a repo name: the dir holding .git.
+home_repo() {
+    local target dir
+    target=$(readlink "$1") || return
+    dir="$target"
+    while [ "$dir" != "/" ] && [ -n "$dir" ]; do
+        [ -e "$dir/.git" ] && { basename "$dir"; return; }
+        dir=$(dirname "$dir")
+    done
+}
+
+collect() {
+    local d f where repo top name
+
+    for d in "$HOME/.claude/skills"/*/; do
+        d="${d%/}"; name=$(basename "$d")
+        [ "$name" = synced ] && continue
+        [ -f "$d/SKILL.md" ] || continue
+        where=user; repo=$(home_repo "$d"); [ -n "$repo" ] && where="user:$repo"
+        describe "$d/SKILL.md" "$name" "$where"
+    done
+
+    for f in "$HOME/.claude/commands"/*.md; do
+        [ -f "$f" ] && describe "$f" "$(basename "$f" .md)" user
+    done
+
+    for f in "$HOME/.claude/skills/synced"/*/*/SKILL.md; do
+        [ -f "$f" ] || continue
+        describe "$f" "$(basename "$(dirname "$f")")" claude.ai | sed 's/^/anthropic-skills:/'
+    done
+
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    [ "$top" = "$HOME" ] && return 0
+    repo=$(basename "$top")
+    for d in "$top/.claude/skills"/*/; do
+        d="${d%/}"; [ -f "$d/SKILL.md" ] && describe "$d/SKILL.md" "$(basename "$d")" "$repo"
+    done
+    for f in "$top/.claude/commands"/*.md; do
+        [ -f "$f" ] && describe "$f" "$(basename "$f" .md)" "$repo"
+    done
+}
+
+collect | sort -f -t'|' -k1,1 -k2,2 \
+    | { if [ -n "$filter" ]; then grep -i -- "$filter"; else cat; fi; } \
+    | awk -F'|' -v cols="$cols" '
+        { n++; a[n] = $1; b[n] = $2; c[n] = $3
+          if (length($1) > wa) wa = length($1); if (length($2) > wb) wb = length($2) }
+        END {
+          if (!n) { print "no skills or commands found"; exit 1 }
+          for (i = 1; i <= n; i++) {
+            line = sprintf("%4d  /%-" wa "s  %-" wb "s  %s", i, a[i], b[i], c[i])
+            if (length(line) > cols) line = substr(line, 1, cols - 1) "…"
+            print line
+          }
+        }'
