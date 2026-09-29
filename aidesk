@@ -1,0 +1,14 @@
+#!/bin/bash
+# aidesk - start or restart the 3AI Desk: Hugo on :1314 and the editor-server on :3005,
+# then open the desk at http://localhost:1314/
+#
+#   aidesk            restart both, open the desk
+#   aidesk start      start whichever is not running
+#   aidesk stop | status | log | hugo | editor | help
+#
+# Self-contained, so `cmdi aidesk` works: nothing here depends on where this repo lives.
+# AIDESK_DIR overrides where the 3aidesk repo is.
+
+repo="${AIDESK_DIR:-$HOME/workspace/iantalabs/3aidesk}"
+[ -x "$repo/bin/aidesk" ] || { echo "aidesk: no 3aidesk repo at $repo (set AIDESK_DIR)" >&2; exit 1; }
+exec "$repo/bin/aidesk" "$@"

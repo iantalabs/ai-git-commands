@@ -40,6 +40,7 @@
 - **fdr** / firebase deploy & resume coding (vue build > deploy > dev) / Franklin Delano Roosevelt
 - **ncol** / open the ncol wall at localhost:8080/#/ncol, starting it first if needed — installs its LaunchAgent on a new machine; `ncol status | restart | stop | log`. Install with `cmdi ncol`
 - **std** / from M16, attach to (or start) the tmux session `m16` on STD, the Studio, over the tailnet: Claude Code sessions keep running there when M16 sleeps; a window per repo (Ctrl-b c new, n next, d detach). tmux by full path, since ssh runs it without a login shell. See aipmo `docs/working-setups.md`
+- **aidesk** / start or restart the 3AI Desk, Hugo on :1314 and the editor-server on :3005, then open the desk at localhost:1314; with no argument it restarts both, since neither picks up every change live. `aidesk start | stop | status | log | hugo | editor`. Output in `~/Library/Logs/3aidesk/`. Runs the 3aidesk repo's `bin/aidesk`; `AIDESK_DIR` overrides where that is. Install with `cmdi aidesk`, or `CMDI_DEST=~/.local/bin ./cmdi aidesk` without sudo
 - **mural** / restart mural's windows on STD (the backdrop on TV2, the presenter on TV3) as last launched, on fresh code; `mural help` for the rest (`backdrop`, `presenter`, `camera`, `snap`, `clip`, `key`, `stop`). Runs the mural repo's `bin/mural`; `MURAL_DIR` overrides where that is. Install with `cmdi mural`, or `CMDI_DEST=~/.local/bin ./cmdi mural` without sudo
 
 ## git
