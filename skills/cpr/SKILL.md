@@ -25,13 +25,21 @@ in `~/.claude`.
    | Repo  | Command                                                     |
    |-------|-------------------------------------------------------------|
    | angel | `scripts/redeploy.sh --skip-phone --skip-watch --both-macs` |
+   | ncol  | `scripts/redeploy.sh --both-macs`                           |
+   | other | `scripts/redeploy.sh --both-macs`, when the script exists   |
 
-   It builds once on this Mac, installs it here, then sends the same build to the other
-   Mac and checks that it reports the same commit. It leaves the other Mac alone when
-   that Mac already runs this commit. Run it in the foreground with a 10-minute
-   timeout; a Mac build takes a few minutes.
-   - `cpr all` also redeploys the iPhone and Watch: drop `--skip-phone --skip-watch`.
-   - A repo not in the table gets a plain `cnp`; say there is no redeploy for it.
+   Each one deploys here, then gets the other Mac onto the same commit and checks that
+   it reports it. It leaves the other Mac alone when that Mac already runs this commit.
+   Run it in the foreground with a 10-minute timeout; a Mac build takes a few minutes.
+   - **angel** builds once here and sends the same app over ssh; its version is in the
+     app's footer. `cpr all` also redeploys the iPhone and Watch: drop
+     `--skip-phone --skip-watch`.
+   - **ncol** builds the wall on each Mac from its own checkout (the other Mac pulls
+     `--ff-only`), restarts the LaunchAgent only when the server's code changed, and asks
+     each Mac's `:8080` for `/modules/version.json`. Its version is in the wall's tab title.
+   - **Any other repo** joins by having a `scripts/redeploy.sh` that takes `--both-macs`
+     and ends with a summary naming each Mac's version and commit. No script means a
+     plain `cnp`; say there is no redeploy for it.
 3. **If the redeploy fails**, the commit is still pushed. Show the failing lines from the
    script's output and its log path, and stop. Don't retry by hand over ssh.
 
