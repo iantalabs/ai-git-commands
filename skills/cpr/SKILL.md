@@ -26,6 +26,7 @@ in `~/.claude`.
    |-------|-------------------------------------------------------------|
    | angel | `scripts/redeploy.sh --skip-phone --skip-watch --both-macs` |
    | ncol  | `scripts/redeploy.sh --both-macs`                           |
+   | mural | `scripts/redeploy.sh --both-macs`                           |
    | other | `scripts/redeploy.sh --both-macs`, when the script exists   |
 
    Each one deploys here, then gets the other Mac onto the same commit and checks that
@@ -37,6 +38,11 @@ in `~/.claude`.
    - **ncol** builds the wall on each Mac from its own checkout (the other Mac pulls
      `--ff-only`), restarts the LaunchAgent only when the server's code changed, and asks
      each Mac's `:8080` for `/modules/version.json`. Its version is in the wall's tab title.
+   - **mural** runs from each Mac's own checkout: the other Mac pulls `--ff-only`, and each
+     rebuilds and reopens its menu bar app (`~/Applications/Mural.app`), stamped with the
+     commit it reports (shown in the menu). Open mural pages reload when page code changed;
+     the server is never restarted mid-call, and a "note" line says when it needs `mural`.
+     Each Mac's displays and features are in the repo's `machines/<Mac>.env`.
    - **Any other repo** joins by having a `scripts/redeploy.sh` that takes `--both-macs`
      and ends with a summary naming each Mac's version and commit. No script means a
      plain `cnp`; say there is no redeploy for it.
