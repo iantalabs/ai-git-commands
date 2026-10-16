@@ -45,8 +45,13 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
    never `--no-verify`. If a hook fails, fix the cause and make a new commit.
 6. **Push.** `git fetch` first; if the branch is behind, `git pull --ff-only`, and if that
    fails, stop and say so. Never force. No upstream: `git push -u origin <branch>`.
+   Then, if the repo has a remote named `mini` (`git remote | grep -qx mini`), push the
+   same branch to it: `git push mini <branch>`. That remote is a bare copy on the family
+   server, and it has only what is pushed to it. If this push fails because the mini is
+   off or unreachable, or it is rejected, say so in the report and carry on. The commit
+   is on origin, so the push has not failed. Never force it.
 7. **Report**, numbered, one line per commit: short SHA, subject, and where it went
-   (`main -> origin`). Then any changes left out (from Scope). Nothing else.
+   (`main -> origin, mini`). Then any changes left out (from Scope). Nothing else.
 
 ## Don't
 

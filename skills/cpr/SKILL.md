@@ -18,7 +18,8 @@ in `~/.claude`.
 1. **Commit and push** exactly as the `cnp` skill says (`~/.claude/skills/cnp/SKILL.md`):
    its scope, secrets check, message style and push rules all apply. Anything after
    `cpr` is guidance for the message, as with `cnp`. If cnp stops (secrets, a push that
-   can't fast-forward), stop here too — never deploy what isn't pushed.
+   can't fast-forward), stop here too — never deploy what isn't pushed. A failed push
+   to the `mini` remote is not a stop; origin is what the other Mac pulls from.
 2. **Redeploy**, from the repo root, if the repo has a redeploy script that knows both
    Macs:
 
