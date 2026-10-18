@@ -1,6 +1,6 @@
 ---
 name: cnp
-description: Commit and push the current repo. Use when the user types cnp or /cnp, or says "commit and push". Saying cnp is the user's explicit permission to commit and push this session's changes in this repo.
+description: Commit and push the current repo. Use when the user types cnp or /cnp, or says "commit and push". Saying cnp is the user's explicit permission to commit and push every uncommitted change in this repo.
 ---
 
 # /cnp — commit and push
@@ -17,8 +17,12 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
 
 - **The repo the session is working in.** If this session also changed other repos,
   commit and push each of them the same way, one after another, and say so.
-- **This session's changes.** If `git status` shows changes this session did not make,
-  leave them out and list them (numbered) in the report. Never sweep them in with `git add -A`.
+- **Every uncommitted change**, this session's or not (the operator, 2026-10-17: "it is just
+  2 of us on both macs in all repos"). Nobody else works in these repos, so a change this
+  session didn't make is something left behind — the other Mac's session, a script's log
+  lines written after its own commit — never someone's work in progress. Look at each one
+  and commit it in its own commit, with a message that says what it is. Still add paths by
+  name, never `git add -A`, and the secrets check below still applies to every file.
 - **The current branch**, as the repo already works. Do not create a branch unless the
   repo's CLAUDE.md says to.
 - Anything after `cnp` is guidance for the message (`cnp the legend merge`).
@@ -36,7 +40,8 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
       ("✅ #6 `ncol` shell command", "Todo #8: cnp")
    2. status changes in `docs/roadmap.md` or a `docs/handoff-*.md` table
    3. the headings of new docs in the diff
-   4. what this session did, from the conversation
+   4. what this session did, from the conversation; for a change it didn't make, what
+      the diff itself shows (`git diff`, `git log -3 -- <path>`)
 4. **Write it in the repo's style**, from `git log`: a subject that reads as a sentence
    and a body on *why*, where the log does that; a repo whose log is terse gets a terse
    message. End with the co-author line the harness gives. Split into several commits
@@ -51,7 +56,8 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
    off or unreachable, or it is rejected, say so in the report and carry on. The commit
    is on origin, so the push has not failed. Never force it.
 7. **Report**, numbered, one line per commit: short SHA, subject, and where it went
-   (`main -> origin, mini`). Then any changes left out (from Scope). Nothing else.
+   (`main -> origin, mini`). Then anything still uncommitted, numbered, and why: only a
+   file held back by the secrets check. Nothing else.
 
 ## Don't
 

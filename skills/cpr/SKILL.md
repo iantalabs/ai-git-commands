@@ -60,7 +60,7 @@ Then a table of where each Mac stands, read from the script's summary:
 | 1 | ✅ ok  | M16 | 1.0.79  | `abc1234` |
 | 2 | ✅ ok  | STD | 1.0.79  | `abc1234` |
 
-Then any changes left out (from cnp's scope). Nothing else.
+Then anything still uncommitted (only what cnp's secrets check held back). Nothing else.
 
 ## Don't
 
