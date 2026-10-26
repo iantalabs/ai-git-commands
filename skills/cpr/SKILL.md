@@ -28,6 +28,7 @@ in `~/.claude`.
    | angel | `scripts/redeploy.sh --skip-phone --skip-watch --both-macs` |
    | ncol  | `scripts/redeploy.sh --both-macs`                           |
    | mural | `scripts/redeploy.sh --both-macs`                           |
+   | vsc-jobs | `scripts/redeploy.sh --both-macs`                        |
    | other | `scripts/redeploy.sh --both-macs`, when the script exists   |
 
    Each one deploys here, then gets the other Mac onto the same commit and checks that
@@ -44,6 +45,14 @@ in `~/.claude`.
      commit it reports (shown in the menu). Open mural pages reload when page code changed;
      the server is never restarted mid-call, and a "note" line says when it needs `mural`.
      Each Mac's displays and features are in the repo's `machines/<Mac>.env`.
+   - **vsc-jobs** runs jobsops from each Mac's own checkout, as two LaunchAgents (the
+     runner on `127.0.0.1:8787`, `hugo server` on `1316`, installed by the script where
+     missing). The runner restarts when the commit it reports isn't HEAD, **never while a
+     tailor is running** (a "note" line says so); the site only when `hugo.yaml` changed.
+     The other Mac pulls `--ff-only`, and **a dirty checkout there is named and skipped**,
+     never stashed: its site writes `pipeline.json`. Then the mini's tailnet copy, through
+     `jobsops/deploy.sh` and its nginx guard; `--no-mini` leaves it. The version and commit
+     are in the jobsops footer and the runner's `/health`.
    - **Any other repo** joins by having a `scripts/redeploy.sh` that takes `--both-macs`
      and ends with a summary naming each Mac's version and commit. No script means a
      plain `cnp`; say there is no redeploy for it.
