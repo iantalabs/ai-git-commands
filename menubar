@@ -1,0 +1,129 @@
+#!/usr/bin/env swift
+// menubar - the operator's menu bar apps as one group, left to right: D J M Angel Famops |
+//
+//   menubar          lists the group left to right, and anything sitting between its items
+//   menubar order    ⌘-drags each item in after the one before it; the pointer goes back
+//
+// macOS 27 ignores an app's saved position (NSStatusItem Preferred Position): the order is
+// MenuBarAgent's, and only a ⌘-drag changes it, as it would by hand. It is kept across the
+// apps' restarts and rebuilds, so `order` is needed once per Mac, or after a new app pushes in.
+// The items are read and dragged through Accessibility, which the terminal this runs in needs
+// (System Settings › Privacy & Security › Accessibility). An app that isn't running is skipped.
+//
+// The "|" is AI Desk's second item (vsum, mac/AIDesk.swift); the why is vsum's todo #3.
+import AppKit
+
+struct Want { let app: String; let label: String?; let name: String }
+let group = [
+    Want(app: "AIDesk", label: "AI Desk", name: "D"),
+    Want(app: "Jobs", label: nil, name: "J"),
+    Want(app: "Mural", label: nil, name: "M"),
+    Want(app: "Angel Mac", label: nil, name: "Angel"),
+    Want(app: "Famops", label: nil, name: "Famops"),
+    Want(app: "AIDesk", label: "AI Desk group end", name: "|"),
+]
+
+struct Item { let app: String; let label: String; let frame: CGRect }
+
+func attribute<T>(_ e: AXUIElement, _ name: String) -> T? {
+    var v: CFTypeRef?
+    return AXUIElementCopyAttributeValue(e, name as CFString, &v) == .success ? v as? T : nil
+}
+
+/// An app's menu bar items, from its AXExtrasMenuBar.
+func items(of app: NSRunningApplication) -> [Item] {
+    let ax = AXUIElementCreateApplication(app.processIdentifier)
+    AXUIElementSetMessagingTimeout(ax, 0.5)
+    guard let bar: AXUIElement = attribute(ax, "AXExtrasMenuBar"),
+          let children: [AXUIElement] = attribute(bar, kAXChildrenAttribute) else { return [] }
+    let name = app.executableURL?.lastPathComponent ?? app.localizedName ?? "?"
+    return children.compactMap { c in
+        var p = CGPoint.zero, s = CGSize.zero
+        guard let pv: AXValue = attribute(c, kAXPositionAttribute), let sv: AXValue = attribute(c, kAXSizeAttribute),
+              AXValueGetValue(pv, .cgPoint, &p), AXValueGetValue(sv, .cgSize, &s) else { return nil }
+        return Item(app: name, label: attribute(c, kAXDescriptionAttribute) ?? "", frame: CGRect(origin: p, size: s))
+    }
+}
+
+func running(_ executable: String) -> NSRunningApplication? {
+    NSWorkspace.shared.runningApplications.first { $0.executableURL?.lastPathComponent == executable }
+}
+
+/// Where each wanted item is now; nil for one whose app isn't running or has no such item.
+func locate() -> [Item?] {
+    group.map { w in
+        guard let app = running(w.app) else { return nil }
+        let all = items(of: app)
+        return w.label.map { l in all.first { $0.label == l } } ?? all.first
+    }
+}
+
+/// Every app's items, for what sits between the group's.
+func everything() -> [Item] {
+    NSWorkspace.shared.runningApplications.flatMap(items)
+}
+
+/// Right after `prev`, with nothing between: the bar leaves about 6 points between items, and an
+/// item's reported width can overlap the next one's by a few points, so only its start counts.
+func follows(_ cur: CGRect, _ prev: CGRect) -> Bool { cur.minX > prev.minX && cur.minX - prev.maxX <= 12 }
+
+func drag(_ from: CGPoint, to: CGPoint) {
+    let src = CGEventSource(stateID: .hidSystemState)
+    func post(_ t: CGEventType, _ p: CGPoint) {
+        let e = CGEvent(mouseEventSource: src, mouseType: t, mouseCursorPosition: p, mouseButton: .left)!
+        e.flags = .maskCommand
+        e.post(tap: .cghidEventTap)
+    }
+    post(.mouseMoved, from); usleep(80_000)
+    post(.leftMouseDown, from); usleep(150_000)
+    for i in 1...20 { post(.leftMouseDragged, CGPoint(x: from.x + (to.x - from.x) * Double(i) / 20, y: from.y)); usleep(25_000) }
+    usleep(150_000)
+    post(.leftMouseUp, to)
+    usleep(500_000)   // the bar settles
+}
+
+func show() {
+    let found = locate()
+    for (w, i) in zip(group, found) where i == nil { print("  \(w.name.padding(toLength: 7, withPad: " ", startingAt: 0)) not in the menu bar (\(w.app) isn't running)") }
+    let placed = zip(group, found).compactMap { w, i in i.map { (w.name, $0) } }
+    guard let lo = placed.map(\.1.frame.minX).min(), let hi = placed.map(\.1.frame.maxX).max() else { return }
+    let mine = Set(placed.map { "\($0.1.app)|\($0.1.label)" })
+    let between = everything().filter { $0.frame.minX > lo && $0.frame.maxX < hi && !mine.contains("\($0.app)|\($0.label)") }
+    let rows = placed.map { ($0.1.frame.minX, "  \($0.0.padding(toLength: 7, withPad: " ", startingAt: 0)) \($0.1.app)") }
+        + between.map { ($0.frame.minX, "    · between: \($0.app)\($0.label.isEmpty ? "" : " (\($0.label))")") }
+    for r in rows.sorted(by: { $0.0 < $1.0 }) { print(String(format: "%7.0f", r.0) + r.1) }
+    let inOrder = zip(placed, placed.dropFirst()).allSatisfy { follows($1.1.frame, $0.1.frame) }
+    print(inOrder ? "in order" : "not in order: `menubar order` puts them together")
+}
+
+func order() {
+    let back = CGEvent(source: nil)?.location ?? .zero
+    defer { CGWarpMouseCursorPosition(back) }
+    var before: Int?   // the last item of the group placed, by its index in `group`
+    for (k, w) in group.enumerated() {
+        guard locate()[k] != nil else { print("  \(w.name): skipped, \(w.app) isn't running"); continue }
+        guard let b = before else { before = k; continue }
+        var done = false
+        // Dropped just past the one before. When it starts on that one's left, the bar closes up
+        // as it is lifted, so later tries drop it a width, then half a width, further left
+        for attempt in 0..<3 {
+            guard let c = locate()[k]?.frame, let p = locate()[b]?.frame else { break }
+            if follows(c, p) { done = true; break }
+            let shift = c.minX > p.minX ? [3.0, 1, 6][attempt] : [3 - c.width, 3, 3 - c.width / 2][attempt]
+            drag(CGPoint(x: c.midX, y: c.midY), to: CGPoint(x: p.maxX + shift, y: c.midY))
+        }
+        if !done, let c = locate()[k]?.frame, let p = locate()[b]?.frame { done = follows(c, p) }
+        print("  \(w.name) \(done ? "after" : "NOT after") \(group[b].name)")
+        before = k
+    }
+}
+
+guard AXIsProcessTrusted() else {
+    print("menubar: this terminal needs Accessibility (System Settings › Privacy & Security › Accessibility)")
+    exit(1)
+}
+switch CommandLine.arguments.dropFirst().first {
+case nil, "list": show()
+case "order": order(); print(""); show()
+default: print("usage: menubar [list | order]"); exit(2)
+}
