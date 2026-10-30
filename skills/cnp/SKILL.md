@@ -46,16 +46,22 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
    and a body on *why*, where the log does that; a repo whose log is terse gets a terse
    message. End with the co-author line the harness gives. Split into several commits
    when the changes are separate things.
-5. **Commit** with `git add <paths>` then `git commit -F -` (a heredoc). Never `--amend`,
+5. **Align the tables** in each `.md` file about to be committed, the way the operator wants
+   them in every repo (`~/.claude/CLAUDE.md`, "Markdown tables"):
+   `node ~/workspace/iantalabs/aipmo/tools/md-tables/format-tables.mjs <files.md>`. It
+   changes only the padding inside tables, so it goes in the same commit. Leave out
+   Markdown a program writes (fixtures, archives, captured transcripts). If aipmo isn't
+   cloned on this Mac, say so in the report and commit anyway.
+6. **Commit** with `git add <paths>` then `git commit -F -` (a heredoc). Never `--amend`,
    never `--no-verify`. If a hook fails, fix the cause and make a new commit.
-6. **Push.** `git fetch` first; if the branch is behind, `git pull --ff-only`, and if that
+7. **Push.** `git fetch` first; if the branch is behind, `git pull --ff-only`, and if that
    fails, stop and say so. Never force. No upstream: `git push -u origin <branch>`.
    Then, if the repo has a remote named `mini` (`git remote | grep -qx mini`), push the
    same branch to it: `git push mini <branch>`. That remote is a bare copy on the family
    server, and it has only what is pushed to it. If this push fails because the mini is
    off or unreachable, or it is rejected, say so in the report and carry on. The commit
    is on origin, so the push has not failed. Never force it.
-7. **Report**, numbered, one line per commit: short SHA, subject, and where it went
+8. **Report**, numbered, one line per commit: short SHA, subject, and where it went
    (`main -> origin, mini`). Then anything still uncommitted, numbered, and why: only a
    file held back by the secrets check. Nothing else.
 
