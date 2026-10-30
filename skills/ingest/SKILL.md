@@ -20,15 +20,15 @@ desk checkout can be on any branch, and the skill must not depend on which.
 node ~/.claude/skills/ingest/ingest-from-matrix.js --room <room> [flags]
 ```
 
-| They type | Run |
-|---|---|
+| They type                                                           | Run |
+| ------------------------------------------------------------------- | --- |
 | `/ingest`, `ingest last link from AI-Tech`, `latest YT from SI Fit` | `--room AI-Tech` / `--room "SI Fit"` (AI-Tech is the default). It takes the newest **YouTube** link and names any newer non-YouTube links it skipped |
-| `ingest last link from <room>` | `--room <room>`: the room's name, or its `!id` |
-| `… every 5 seconds` | add `--interval 5` (default 10) |
-| `ingest <youtube url> in <room>` | `--room <room> --url <url>`: that link, answered in the room |
-| `ingest <youtube url>` (no room) | `--url <url>` only: ingested, nothing posted |
-| `… again`, `… anyway` | add `--force`: the video is already on the desk |
-| `what would ingest do?` | add `--dry-run`: title, length, chapters, frame count; nothing posted |
+| `ingest last link from <room>`                                      | `--room <room>`: the room's name, or its `!id` |
+| `… every 5 seconds`                                                 | add `--interval 5` (default 10) |
+| `ingest <youtube url> in <room>`                                    | `--room <room> --url <url>`: that link, answered in the room |
+| `ingest <youtube url>` (no room)                                    | `--url <url>` only: ingested, nothing posted |
+| `… again`, `… anyway`                                               | add `--force`: the video is already on the desk |
+| `what would ingest do?`                                             | add `--dry-run`: title, length, chapters, frame count; nothing posted |
 
 1. **Dry-run first when the request is ambiguous** (which room, which link). Otherwise
    run it straight away — posting the reply in the room is the point of the command.

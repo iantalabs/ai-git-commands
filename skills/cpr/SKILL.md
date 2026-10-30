@@ -23,13 +23,13 @@ in `~/.claude`.
 2. **Redeploy**, from the repo root, if the repo has a redeploy script that knows both
    Macs:
 
-   | Repo  | Command                                                     |
-   |-------|-------------------------------------------------------------|
-   | angel | `scripts/redeploy.sh --skip-phone --skip-watch --both-macs` |
-   | ncol  | `scripts/redeploy.sh --both-macs`                           |
-   | mural | `scripts/redeploy.sh --both-macs`                           |
-   | vsc-jobs | `scripts/redeploy.sh --both-macs`                        |
-   | other | `scripts/redeploy.sh --both-macs`, when the script exists   |
+   | Repo     | Command |
+   | -------- | ------- |
+   | angel    | `scripts/redeploy.sh --skip-phone --skip-watch --both-macs` |
+   | ncol     | `scripts/redeploy.sh --both-macs` |
+   | mural    | `scripts/redeploy.sh --both-macs` |
+   | vsc-jobs | `scripts/redeploy.sh --both-macs` |
+   | other    | `scripts/redeploy.sh --both-macs`, when the script exists |
 
    Each one deploys here, then gets the other Mac onto the same commit and checks that
    it reports it. It leaves the other Mac alone when that Mac already runs this commit.
@@ -64,10 +64,10 @@ in `~/.claude`.
 Numbered, as `cnp` reports it: one line per commit (short SHA, subject, `main -> origin`).
 Then a table of where each Mac stands, read from the script's summary:
 
-| # | Status | Mac | Version | Commit    |
-|---|--------|-----|---------|-----------|
-| 1 | ✅ ok  | M16 | 1.0.79  | `abc1234` |
-| 2 | ✅ ok  | STD | 1.0.79  | `abc1234` |
+| #   | Status | Mac | Version | Commit |
+| --- | ------ | --- | ------- | ------ |
+| 1   | ✅ ok  | M16 | 1.0.79  | `abc1234` |
+| 2   | ✅ ok  | STD | 1.0.79  | `abc1234` |
 
 Then anything still uncommitted (only what cnp's secrets check held back). Nothing else.
 
