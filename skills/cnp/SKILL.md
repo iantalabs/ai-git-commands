@@ -49,9 +49,12 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
 5. **Align the tables** in each `.md` file about to be committed, the way the operator wants
    them in every repo (`~/.claude/CLAUDE.md`, "Markdown tables"):
    `node ~/workspace/iantalabs/aipmo/tools/md-tables/format-tables.mjs <files.md>`. It
-   changes only the padding inside tables, so it goes in the same commit. Leave out
-   Markdown a program writes (fixtures, archives, captured transcripts). If aipmo isn't
-   cloned on this Mac, say so in the report and commit anyway.
+   changes only the padding inside tables, so it goes in the same commit. It also prints
+   `shape    <file>: N` for tables that break the operator's shape (`**`, words in `St`,
+   column order, long key columns). That never stops the commit, as most repos aren't
+   converted yet, but `--check` on that file lists them: fix the ones in rows this commit
+   adds or changes. Leave out Markdown a program writes (fixtures, archives, captured
+   transcripts). If aipmo isn't cloned on this Mac, say so in the report and commit anyway.
 6. **Commit** with `git add <paths>` then `git commit -F -` (a heredoc). Never `--amend`,
    never `--no-verify`. If a hook fails, fix the cause and make a new commit.
 7. **Push.** `git fetch` first; if the branch is behind, `git pull --ff-only`, and if that
@@ -63,7 +66,8 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
    is on origin, so the push has not failed. Never force it.
 8. **Report**, numbered, one line per commit: short SHA, subject, and where it went
    (`main -> origin, mini`). Then anything still uncommitted, numbered, and why: only a
-   file held back by the secrets check. Nothing else.
+   file held back by the secrets check. Then, if step 5 printed any, one line with the
+   count of shape problems left in the committed files. Nothing else.
 
 ## Don't
 
