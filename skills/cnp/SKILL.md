@@ -15,8 +15,13 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
 
 ## Scope
 
-- **The repo the session is working in.** If this session also changed other repos,
-  commit and push each of them the same way, one after another, and say so.
+- **The repo the session is working in**, and only it. If this session also wrote into
+  other repos, or the user says `cnp all` or `cnp <repo>…`, those go through the `xcnp`
+  skill once this repo is done: it commits and pushes only their handoffs
+  (`docs/handoff-*.md`, added todo rows), plan then apply, and names what it leaves. Never
+  `git -C <other repo> commit` or `push` here: Claude Code's permission check rightly stops
+  it (2026-10-28), and code a session changed in another repo is a handoff for that repo's
+  own session and its own `cpr` (ai-git-commands todo #1).
 - **Every uncommitted change**, this session's or not (the operator, 2026-10-17: "it is just
   2 of us on both macs in all repos"). Nobody else works in these repos, so a change this
   session didn't make is something left behind — the other Mac's session, a script's log

@@ -1,0 +1,431 @@
+#!/usr/bin/env node
+// xcnp - commit and push a session's handoffs in other repos, and nothing else (todo #1).
+//
+//   xcnp <repo>... [--from <repo>] [--coauthor "Name <email>"]   plan, show it, apply it
+//   xcnp --plan <repo>... [--from <repo>] [--coauthor ...]       show the plan and save it
+//   xcnp --apply                                                  run exactly the saved plan
+//   --no-notify    no Matrix notice (the cross-repo log line is still written)
+//
+// A session working in one repo writes handoffs into others. In each named repo xcnp commits
+// only docs/handoff-*.md and rows added to docs/project_notes/todos.md (added, never changed:
+// a table re-padded by the formatter still counts as added). Every other change there is named
+// and left for that repo's own session: code crosses a repo line as a handoff, and the owner's
+// cnp or cpr ships it. A file that isn't on the list but is staged stops that repo.
+//
+// Safety, in the order it runs:
+//   1. The repo is a checkout directly under ~/workspace/iantalabs, or its origin is in
+//      aipmo's portfolio.yml. Anything else is refused.
+//   2. The current branch, named in the report; a detached HEAD or no upstream is refused,
+//      and so is a branch with commits of its own not yet pushed (they are the owner's).
+//   3. The cnp secrets check on every file, by name and by content.
+//   4. --plan writes each file's sha256; --apply refuses a repo whose files, branch or HEAD
+//      changed since. Then fetch, fast-forward only, commit, push origin, then mini when it
+//      exists (its failure is reported, not fatal). Never force, never amend, never --no-verify.
+//   5. After a push: a notice in the target repo's Matrix room (ncol's matrix-post), and a row
+//      in aipmo's docs/cross-repo-log.md (aipmo #22), committed and pushed there.
+//
+// One allow rule in ~/.claude/settings.json, Bash(xcnp *), lets a Claude session run this
+// without a prompt; a raw `git -C <other repo> push` stays blocked, which is the protection.
+//
+// Overrides, for tests: XCNP_WORKSPACE (~/workspace/iantalabs), XCNP_STATE (~/.claude/xcnp),
+// XCNP_LOG_REPO (<workspace>/aipmo), XCNP_POST (ncol's post.mjs), XCNP_FORMAT (aipmo's
+// format-tables.mjs), XCNP_COAUTHOR. Zero dependencies.
+
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync, appendFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+
+const HOME = homedir();
+const WS = process.env.XCNP_WORKSPACE || join(HOME, "workspace", "iantalabs");
+const STATE = process.env.XCNP_STATE || join(HOME, ".claude", "xcnp");
+const PLAN = join(STATE, "plan.json");
+const LOG_REPO = process.env.XCNP_LOG_REPO || join(WS, "aipmo");
+const LOG_FILE = "docs/cross-repo-log.md";
+const POST = process.env.XCNP_POST || join(WS, "ncol", "tools", "matrix-post", "post.mjs");
+const FORMAT = process.env.XCNP_FORMAT || join(WS, "aipmo", "tools", "md-tables", "format-tables.mjs");
+const TODOS = "docs/project_notes/todos.md";
+const HANDOFF = /^docs\/handoff-[^/]+\.md$/;
+const PLAN_MAX_AGE_H = 24;
+
+// ---- small helpers ------------------------------------------------------------------------
+
+function die(msg) {
+    console.error(`xcnp: ${msg}`);
+    process.exit(2);
+}
+
+function run(cmd, args, cwd, input) {
+    const r = spawnSync(cmd, args, { cwd, input, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+    const raw = r.stdout || "";
+    return { ok: r.status === 0, code: r.status, raw, out: raw.trim(), err: (r.stderr || r.error?.message || "").trim() };
+}
+
+const git = (cwd, ...args) => run("git", args, cwd);
+const sha256 = (file) => createHash("sha256").update(readFileSync(file)).digest("hex");
+const real = (p) => { try { return realpathSync(p); } catch { return null; } };
+const today = () => new Date().toISOString().slice(0, 10);
+
+function parseArgs(argv) {
+    const a = { mode: "both", repos: [], from: null, coauthor: process.env.XCNP_COAUTHOR || "Claude <noreply@anthropic.com>", notify: true };
+    for (let i = 0; i < argv.length; i++) {
+        const x = argv[i];
+        if (x === "--plan") a.mode = "plan";
+        else if (x === "--apply") a.mode = "apply";
+        else if (x === "--from") a.from = argv[++i];
+        else if (x === "--coauthor") a.coauthor = argv[++i];
+        else if (x === "--no-notify") a.notify = false;
+        else if (x === "-h" || x === "--help") a.help = true;
+        else if (x.startsWith("-")) die(`unknown option ${x} (try --help)`);
+        else a.repos.push(x);
+    }
+    return a;
+}
+
+// ---- which repos ---------------------------------------------------------------------------
+
+function portfolioRepos() {
+    const file = join(WS, "aipmo", "portfolio.yml");
+    if (!existsSync(file)) return new Set();
+    return new Set([...readFileSync(file, "utf8").matchAll(/^\s*repo:\s*["']?([^\s"'#]+)/gm)].map((m) => m[1]));
+}
+
+function originSlug(root) {
+    const url = git(root, "remote", "get-url", "origin").out;
+    const m = url.match(/[:/]([^/:]+)\/([^/]+?)(?:\.git)?$/);
+    return m ? `${m[1]}/${m[2]}` : null;
+}
+
+/** A repo name or path, resolved and checked against the allowlist; { root } or { error }. */
+function resolveRepo(name, portfolio) {
+    const path = isAbsolute(name) || name.startsWith(".") || name.includes("/") ? resolve(name) : join(WS, name);
+    const root = real(path);
+    if (!root) return { error: `no checkout at ${path}` };
+    const top = git(root, "rev-parse", "--show-toplevel");
+    if (!top.ok || real(top.out) !== root) return { error: `${root} is not the top of a git checkout` };
+    const underWs = dirname(root) === real(WS);
+    const slug = originSlug(root);
+    if (!underWs && !(slug && portfolio.has(slug))) {
+        return { error: `${root} is neither under ${WS} nor in aipmo's portfolio.yml` };
+    }
+    return { root, name: basename(root) };
+}
+
+// ---- what may be committed -----------------------------------------------------------------
+
+/** `git status` entries: { x, y, path }; renames and copies carry the new path. */
+function statusEntries(root) {
+    const r = run("git", ["status", "--porcelain=v1", "-z", "-uall"], root);
+    const parts = r.raw.split("\0").filter(Boolean);
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        const e = { x: p[0], y: p[1], path: p.slice(3) };
+        if (e.x === "R" || e.x === "C") i++; // the original path follows
+        out.push(e);
+    }
+    return out;
+}
+
+const isStaged = (e) => e.x !== " " && e.x !== "?";
+
+/** A table line with its padding gone, so a row re-padded by the formatter compares equal. */
+function normalise(line) {
+    const t = line.trim();
+    if (!t.startsWith("|")) return line.replace(/\s+$/, "");
+    return t.split("|").map((c) => c.trim().replace(/^(:?)-+(:?)$/, "$1-$2")).join("|");
+}
+
+/** The lines added to a file, if HEAD's version survives in it unchanged and in order; else null. */
+function addedOnly(root, rel) {
+    const head = git(root, "show", `HEAD:${rel}`);
+    const before = head.ok ? head.out.split("\n") : [];
+    const after = readFileSync(join(root, rel), "utf8").replace(/\n$/, "").split("\n");
+    const b = before.map(normalise), a = after.map(normalise);
+    const added = [];
+    let i = 0;
+    for (let j = 0; j < a.length; j++) {
+        if (i < b.length && a[j] === b[i]) i++;
+        else added.push(after[j]);
+    }
+    // Blank lines may move about; any other line of HEAD's that is missing is a change.
+    while (i < b.length && b[i].trim() === "") i++;
+    return i === b.length ? added : null;
+}
+
+const SECRET_NAMES = [/(^|\/)\.env/, /(^|\/)secrets\//, /\.pem$/, /\.key$/, /(^|\/)id_[^/]*$/, /token[^/]*$/i];
+const SECRET_TEXT = [
+    [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "a private key"],
+    [/\bgh[pousr]_[A-Za-z0-9]{30,}/, "a GitHub token"],
+    [/\bglpat-[A-Za-z0-9_-]{20,}/, "a GitLab token"],
+    [/\bsk-(ant-)?[A-Za-z0-9_-]{24,}/, "an API key (sk-)"],
+    [/\bxox[abpr]-[A-Za-z0-9-]{10,}/, "a Slack token"],
+    [/\bAKIA[0-9A-Z]{16}\b/, "an AWS key"],
+    [/\bAIza[0-9A-Za-z_-]{35}\b/, "a Google API key"],
+    [/\bsyt_[A-Za-z0-9_]{10,}/, "a Matrix token"],
+    [/"access_token"\s*:\s*"[^"]{8,}"/, "an access_token"],
+];
+
+/** Why a file looks like a credential, or null. A .md named *token* is judged by its text. */
+function secretIn(root, rel) {
+    for (const re of SECRET_NAMES) {
+        if (re.test(rel) && !(re.source.startsWith("token") && rel.endsWith(".md"))) return `its name (${rel})`;
+    }
+    const text = readFileSync(join(root, rel), "utf8");
+    for (const [re, what] of SECRET_TEXT) if (re.test(text)) return `it holds what looks like ${what}`;
+    return null;
+}
+
+function titleOfHandoff(root, rel) {
+    const m = readFileSync(join(root, rel), "utf8").match(/^#\s+(.+)$/m);
+    return (m ? m[1] : basename(rel, ".md")).replace(/[`*]/g, "").trim();
+}
+
+function titleOfTodos(added) {
+    const heads = added.map((l) => l.match(/^##\s+#?(\d+)\s*[—–-]+\s*(.+?)(\s+·.*)?$/)).filter(Boolean);
+    if (heads.length) return heads.map((m) => `todo #${m[1]} ${m[2].replace(/[`*]/g, "")}`).join("; ");
+    const rows = added.filter((l) => /^\s*\|/.test(l) && !/^\s*\|[\s:|-]+\|\s*$/.test(l));
+    return rows.length === 1 ? "a todo row" : `${rows.length || "new"} todo rows`;
+}
+
+// ---- the plan ------------------------------------------------------------------------------
+
+function planRepo(root, name, from) {
+    const p = { name, root, branch: null, head: null, files: [], left: [], blocked: null, message: null };
+    const branch = git(root, "symbolic-ref", "--short", "-q", "HEAD");
+    if (!branch.ok) return { ...p, blocked: "detached HEAD" };
+    p.branch = branch.out;
+    p.head = git(root, "rev-parse", "HEAD").out;
+    if (name === from.name) return { ...p, blocked: `${name} is the session's own repo: that is cnp's` };
+    const up = git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}");
+    if (!up.ok) return { ...p, blocked: `${p.branch} has no upstream` };
+    p.upstream = up.out;
+    const ahead = Number(git(root, "rev-list", "--count", "@{u}..HEAD").out || 0);
+    if (ahead) return { ...p, blocked: `${p.branch} has ${ahead} commit(s) of its own not pushed: they are the owner's to push` };
+
+    const titles = [];
+    for (const e of statusEntries(root)) {
+        const code = `${e.x}${e.y}`;
+        const okCode = ["??", " M", "M ", "MM", "A ", "AM"].includes(code);
+        let kind = null, why = null, added = null;
+        if (okCode && HANDOFF.test(e.path)) kind = "handoff";
+        else if (okCode && e.path === TODOS) {
+            added = addedOnly(root, e.path);
+            if (added) kind = "todos";
+            else why = "rows changed or removed, not only added";
+        } else why = HANDOFF.test(e.path) || e.path === TODOS ? `status ${code.trim()}` : "not a handoff";
+
+        if (kind) {
+            const secret = secretIn(root, e.path);
+            if (secret) { p.left.push({ path: e.path, why: `held back by the secrets check: ${secret}` }); continue; }
+            p.files.push({ path: e.path, kind, sha256: sha256(join(root, e.path)) });
+            titles.push(kind === "handoff" ? titleOfHandoff(root, e.path) : titleOfTodos(added));
+        } else {
+            if (isStaged(e)) p.blocked = `${e.path} is staged and is not a handoff`;
+            p.left.push({ path: e.path, why: `${why}; left for ${name}'s own session` });
+        }
+    }
+    if (!p.files.length && !p.blocked) p.blocked = "no handoff to commit";
+    // Handoffs first, so the subject leads with the document, not the todo row that points to it.
+    const order = p.files.map((f, i) => [f, titles[i]]).sort((a, b) => (a[0].kind === "handoff" ? 0 : 1) - (b[0].kind === "handoff" ? 0 : 1));
+    p.files = order.map((o) => o[0]);
+    titles.splice(0, titles.length, ...order.map((o) => o[1]));
+    let subject = `Handoff from ${from.name}: ${titles.join("; ")}`;
+    if (subject.length > 100) subject = `${subject.slice(0, 97).replace(/\s+\S*$/, "")}...`;
+    p.message = subject;
+    return p;
+}
+
+function commitMessage(p, plan) {
+    const fromAt = plan.from.head ? `${plan.from.name}@${plan.from.head}` : plan.from.name;
+    return [
+        p.message,
+        "",
+        `Written by ${fromAt}'s session and committed by xcnp, which commits handoff docs and`,
+        "added todo rows in another repo, and nothing else:",
+        "",
+        ...p.files.map((f) => `- ${f.path}`),
+        "",
+        `Co-Authored-By: ${plan.coauthor}`,
+        "",
+    ].join("\n");
+}
+
+function printPlan(plan) {
+    console.log(`xcnp plan, from ${plan.from.name}${plan.from.head ? ` @ ${plan.from.head}` : ""}:`);
+    plan.repos.forEach((p, n) => {
+        console.log(`\n${n + 1}. ${p.name}${p.root ? `  (${p.root}, branch ${p.branch ?? "none"})` : ""}`);
+        if (p.blocked) console.log(`   refused: ${p.blocked}`);
+        if (p.files.length) {
+            console.log(`   commit:  "${p.message}"`);
+            for (const f of p.files) console.log(`            ${f.path}  (${f.kind}, ${f.sha256.slice(0, 12)})`);
+        }
+        for (const l of p.left) console.log(`   left:    ${l.path}  - ${l.why}`);
+    });
+    const code = plan.repos.flatMap((p) => p.left.filter((l) => / own session$/.test(l.why)).map((l) => `${p.name}/${l.path}`));
+    if (code.length) {
+        console.log(`\nLeft as they are: ${code.length} other change(s). Code changed in another repo is a handoff`);
+        console.log("for that repo's own session, which commits it with its own cnp and ships it with its own cpr.");
+    }
+}
+
+// ---- applying ------------------------------------------------------------------------------
+
+/** Fetch, fast-forward if behind, and refuse if the branch has commits of its own. */
+function syncBranch(root, branch) {
+    const f = git(root, "fetch", "-q", "origin");
+    if (!f.ok) return `fetch failed: ${f.err}`;
+    const ahead = Number(git(root, "rev-list", "--count", "@{u}..HEAD").out || 0);
+    if (ahead) return `${branch} has ${ahead} commit(s) of its own not pushed`;
+    const behind = Number(git(root, "rev-list", "--count", "HEAD..@{u}").out || 0);
+    if (behind) {
+        const m = git(root, "merge", "--ff-only", "-q", "@{u}");
+        if (!m.ok) return `fast-forward failed: ${m.err}`;
+    }
+    return null;
+}
+
+/** Commit exactly these paths and push; { sha, pushed: [...], notes: [...] } or { error }. */
+function commitAndPush(root, branch, paths, message) {
+    const notes = [];
+    const md = paths.filter((f) => f.endsWith(".md")).map((f) => join(root, f));
+    if (md.length && existsSync(FORMAT)) {
+        const r = run("node", [FORMAT, ...md], root);
+        const shapes = [...(r.out + "\n" + r.err).matchAll(/^shape\s+\S+:\s*(\d+)/gm)].reduce((s, m) => s + Number(m[1]), 0);
+        if (shapes) notes.push(`${shapes} table shape problem(s) left`);
+    } else if (md.length) notes.push("tables not aligned: aipmo's format-tables.mjs isn't here");
+    const add = git(root, "add", "--", ...paths);
+    if (!add.ok) return { error: `git add failed: ${add.err}` };
+    const c = run("git", ["commit", "-q", "-F", "-"], root, message);
+    if (!c.ok) {
+        git(root, "reset", "-q", "--", ...paths);
+        return { error: `commit failed: ${c.err || c.out}` };
+    }
+    const sha = git(root, "rev-parse", "--short", "HEAD").out;
+    const pushed = [];
+    const p = git(root, "push", "-q", "origin", branch);
+    if (!p.ok) return { sha, error: `committed ${sha} but the push to origin failed: ${p.err}. Nothing was forced; that repo's own cnp pushes it` };
+    pushed.push("origin");
+    if (git(root, "remote").out.split("\n").includes("mini")) {
+        const m = git(root, "push", "-q", "mini", branch);
+        if (m.ok) pushed.push("mini");
+        else notes.push(`mini not pushed: ${m.err.split("\n")[0]}`);
+    }
+    return { sha, pushed, notes };
+}
+
+function notify(p, sha, plan) {
+    if (!existsSync(POST)) return "no notice: ncol's matrix-post isn't here";
+    const text = `Handoff from ${plan.from.name}: ${p.files.map((f) => `\`${f.path}\``).join(", ")}, ${sha} on \`${p.branch}\` (xcnp)`;
+    const r = run("node", [POST, "--repo", p.root, "--text", "-", "--no-thread", "--notice"], p.root, text);
+    return r.ok ? null : `no notice: ${(r.err || r.out).split("\n")[0]}`;
+}
+
+/** Append the rows to aipmo's cross-repo log and commit it there; a note on what happened. */
+function writeLog(rows, coauthor) {
+    const root = real(LOG_REPO);
+    if (!root) return `no log: ${LOG_REPO} isn't here`;
+    const file = join(root, LOG_FILE);
+    if (!existsSync(file)) {
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, [
+            "# Cross-repo log",
+            "",
+            "Every commit one repo's session made in another, one row each, newest last. Written by",
+            "`xcnp` (ai-git-commands, its todo #1), which commits only handoff docs and added todo rows;",
+            "the index of open cross-repo work is [#22's table](project_notes/todos.md), this is its trail.",
+            "",
+            "| Date | From | To | Branch | Files |",
+            "| ---- | ---- | -- | ------ | ----- |",
+            "",
+        ].join("\n"));
+    }
+    const text = readFileSync(file, "utf8").replace(/\n*$/, "\n");
+    writeFileSync(file, text + rows.join("\n") + "\n");
+    const staged = statusEntries(root).filter((e) => isStaged(e) && e.path !== LOG_FILE);
+    if (staged.length) return `log row written to ${root}/${LOG_FILE}, not committed: ${staged[0].path} is staged there`;
+    const branch = git(root, "symbolic-ref", "--short", "-q", "HEAD").out;
+    if (!branch) return `log row written, not committed: ${root} has a detached HEAD`;
+    const sync = syncBranch(root, branch);
+    if (sync) return `log row written to ${root}/${LOG_FILE}, not committed: ${sync}`;
+    const r = commitAndPush(root, branch, [LOG_FILE], `Cross-repo log: ${rows.length} handoff commit(s) by xcnp\n\nCo-Authored-By: ${coauthor}\n`);
+    if (r.error) return `log: ${r.error}`;
+    return `log: ${basename(root)} ${r.sha} -> ${r.pushed.join(", ")}`;
+}
+
+function apply(plan, notifyOn) {
+    const ageH = (Date.now() - Date.parse(plan.created)) / 3.6e6;
+    if (!(ageH < PLAN_MAX_AGE_H)) die(`the plan is ${Math.round(ageH)}h old: make a new one with --plan`);
+    const results = [], rows = [];
+    let failed = false;
+    for (const p of plan.repos) {
+        if (p.blocked) { results.push(`${p.name}: refused, ${p.blocked}`); continue; }
+        // Exactly the plan: same branch, same HEAD, same bytes, nothing else staged.
+        const branch = git(p.root, "symbolic-ref", "--short", "-q", "HEAD").out;
+        const head = git(p.root, "rev-parse", "HEAD").out;
+        const changed = p.files.filter((f) => !existsSync(join(p.root, f.path)) || sha256(join(p.root, f.path)) !== f.sha256);
+        const listed = new Set(p.files.map((f) => f.path));
+        const staged = statusEntries(p.root).filter((e) => isStaged(e) && !listed.has(e.path));
+        const why = branch !== p.branch ? `the branch is ${branch || "detached"} now, not ${p.branch}`
+            : head !== p.head ? `HEAD moved since the plan (${p.head.slice(0, 7)} -> ${head.slice(0, 7)})`
+            : changed.length ? `changed since the plan: ${changed.map((f) => f.path).join(", ")}`
+            : staged.length ? `${staged[0].path} is staged now`
+            : syncBranch(p.root, p.branch);
+        if (why) { results.push(`${p.name}: refused, ${why}. Run xcnp --plan again`); failed = true; continue; }
+        const r = commitAndPush(p.root, p.branch, p.files.map((f) => f.path), commitMessage(p, plan));
+        if (r.error) { results.push(`${p.name}: ${r.error}`); failed = true; continue; }
+        const notes = [...r.notes];
+        if (notifyOn) { const n = notify(p, r.sha, plan); if (n) notes.push(n); }
+        results.push(`${p.name}: ${r.sha} "${p.message}" (${p.branch} -> ${r.pushed.join(", ")})${notes.length ? `; ${notes.join("; ")}` : ""}`);
+        const from = plan.from.head ? `${plan.from.name} ${plan.from.head}` : plan.from.name;
+        rows.push(`| ${today()} | ${from} | ${p.name} ${r.sha} | ${p.branch} | ${p.files.map((f) => f.path).join(", ")} |`);
+        mkdirSync(STATE, { recursive: true });
+        appendFileSync(join(STATE, "log.jsonl"), JSON.stringify({ at: new Date().toISOString(), from: plan.from, to: p.name, branch: p.branch, sha: r.sha, files: p.files.map((f) => f.path) }) + "\n");
+    }
+    if (rows.length) results.push(writeLog(rows, plan.coauthor));
+    renameSync(PLAN, join(STATE, "plan.applied.json"));
+    console.log("\nxcnp applied:");
+    results.forEach((r, n) => console.log(`${n + 1}. ${r}`));
+    const left = plan.repos.flatMap((p) => p.left.map((l) => `${p.name}/${l.path}`));
+    if (left.length) console.log(`\nStill uncommitted, as planned: ${left.join(", ")}`);
+    return failed ? 1 : 0;
+}
+
+// ---- main ----------------------------------------------------------------------------------
+
+const args = parseArgs(process.argv.slice(2));
+if (args.help) {
+    console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1).filter((l) => l.startsWith("//")).map((l) => l.slice(3)).join("\n"));
+    process.exit(0);
+}
+
+if (args.mode === "apply") {
+    if (args.repos.length) die("--apply takes no repos: it runs the saved plan exactly");
+    if (!existsSync(PLAN)) die(`no plan at ${PLAN}: run xcnp --plan <repo>... first`);
+    process.exit(apply(JSON.parse(readFileSync(PLAN, "utf8")), args.notify));
+}
+
+if (!args.repos.length) die("name the repos: xcnp [--plan] <repo>... [--from <repo>]");
+
+const cwdTop = git(process.cwd(), "rev-parse", "--show-toplevel");
+const fromRoot = args.from ? real(join(WS, args.from)) : cwdTop.ok ? cwdTop.out : null;
+const from = {
+    name: args.from || (fromRoot ? basename(fromRoot) : "unknown"),
+    head: fromRoot ? git(fromRoot, "rev-parse", "--short", "HEAD").out || null : null,
+};
+const portfolio = portfolioRepos();
+const plan = { created: new Date().toISOString(), from, coauthor: args.coauthor, repos: [] };
+for (const name of [...new Set(args.repos)]) {
+    const r = resolveRepo(name, portfolio);
+    if (r.error) plan.repos.push({ name, root: null, branch: null, files: [], left: [], blocked: r.error });
+    else plan.repos.push(planRepo(r.root, r.name, from));
+}
+mkdirSync(STATE, { recursive: true });
+writeFileSync(PLAN, JSON.stringify(plan, null, 2) + "\n");
+printPlan(plan);
+if (args.mode === "plan") {
+    console.log(`\nSaved to ${PLAN}. xcnp --apply runs exactly this, and refuses a file changed since.`);
+    process.exit(0);
+}
+process.exit(apply(plan, args.notify));

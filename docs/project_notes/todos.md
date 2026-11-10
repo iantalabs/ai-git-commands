@@ -16,7 +16,7 @@ peak fraction of a ~200k-token window. **The matrix holds open items only**; a d
 
 | Pri | St  | #   | Item                                                       | Effort | Tokens    | Context | Pairing and notes |
 | --- | --- | --- | ---------------------------------------------------------- | ------ | --------- | ------- | ----------------- |
-| P2  | 📋  | 1   | `xcnp`: commit a session's handoffs in other repos, safely | ~2h    | ~150–250k | ~25%    | A session in one repo writes handoffs into others (vsum → aipmo, 3aidesk on 2026-10-28), and `cnp` there was refused by Claude Code's permission check (the operator, 2026-10-28). Handoff docs only, plan then apply, one allow rule. Touches `skills/cnp`; aipmo #22 keeps its log |
+| P2  | 🔨  | 1   | `xcnp`: commit a session's handoffs in other repos, safely | ~2h    | ~150–250k | ~25%    | Built 2026-11-10 on STD and tested in a sandbox (see the section). Left: M16 install, and the first real handoff (vsum → aipmo) with its Matrix notice and no prompt. Touches `skills/cnp`; aipmo #22 keeps its log |
 
 ## Closed
 
@@ -72,6 +72,24 @@ got it through; the operator asked for a mechanism that doesn't depend on that.
 5. **`skills/cnp`** reworded: cnp commits the current repo; `cnp all` or `cnp <repo>…` hands the
    other repos to `xcnp`. Code a session changed in another repo stays a handoff for that repo's
    session and its own `cpr`; xcnp says so and lists it.
+
+**Built** 2026-11-10: [`xcnp`](../../xcnp), [`skills/xcnp`](../../skills/xcnp/SKILL.md),
+`skills/cnp` reworded, `"Bash(xcnp *)"` in STD's `~/.claude/settings.json`. Two choices the
+spec left open: a todos.md counts as "added rows" when HEAD's version survives in it in
+order, table padding ignored (so a formatter re-pad still passes); and the log is a new
+`docs/cross-repo-log.md` in aipmo, committed by xcnp itself, since #22's `cross-repo.md`
+(the index of open X rows) isn't built and is a different thing. A branch with unpushed
+commits of its own is refused: pushing them would push the owner's work.
+
+Tested in a sandbox (bare remotes, a fake room): plan lists the handoff and an added row
+(re-padded table) and names `app.js` as left; a handoff edited after the plan is refused;
+apply commits, pushes origin and mini, sends the notice, writes and pushes the log row; a
+changed row, a staged code file, an unpushed commit and a GitHub token each stop or hold
+back as they should; a branch behind its upstream is fast-forwarded first. A `--plan` on
+the real aipmo, 3aidesk, ncol and vsum listed only ncol's added todo #74.
+
+**Left:** on M16, the two symlinks and the allow rule (README, `xcnp`); and the real check
+below, which needs a real handoff.
 
 **Validate:** by check. A handoff written from vsum into aipmo: `xcnp --plan aipmo` lists only it;
 a code file changed beside it is named and left; `--apply` commits and pushes it with no
