@@ -189,6 +189,32 @@ function titleOfTodos(added) {
     return rows.length === 1 ? "a todo row" : `${rows.length || "new"} todo rows`;
 }
 
+/** Todo numbers a todos.md diff adds: "## #N" headings, and the # cell of added matrix rows. */
+function todoNumbers(added) {
+    const nums = new Set();
+    for (const l of added) {
+        const h = l.match(/^##\s+#?(\d+)\s*[—–-]/);
+        if (h) nums.add(h[1]);
+        const cells = l.split("|").map((c) => c.trim());
+        if (/^\s*\|/.test(l) && /^\d+$/.test(cells[3] ?? "")) nums.add(cells[3]);
+    }
+    return [...nums];
+}
+
+/**
+ * Todos this commit files that aipmo's docs/cross-repo.md has no row citing ("no X row").
+ * It only reads the table: the row is the session's to write. A handoff alone has no todo
+ * number, so it asks for any row citing the repo. No table on this Mac: no claim either way.
+ */
+function missingXRows(name, nums) {
+    const file = join(LOG_REPO, "docs", "cross-repo.md");
+    if (!existsSync(file)) return [];
+    const rows = readFileSync(file, "utf8").split("\n").filter((l) => /^\|\s*X\d+\s*\|/.test(l)).map((l) => l.split("|").slice(3, 5).join("|"));
+    const cites = (needle) => rows.some((r) => r.split("|").some((cell) => cell.includes(needle)));
+    if (!nums.length) return cites(name) ? [] : [name];
+    return nums.filter((n) => !rows.some((r) => new RegExp(`(^|[^\\w-])${name.replace(/\W/g, "\\$&")}\\s+#${n}\\b`).test(r))).map((n) => `${name} #${n}`);
+}
+
 // ---- the plan ------------------------------------------------------------------------------
 
 function planRepo(root, name, from) {
@@ -204,7 +230,7 @@ function planRepo(root, name, from) {
     const ahead = Number(git(root, "rev-list", "--count", "@{u}..HEAD").out || 0);
     if (ahead) return { ...p, blocked: `${p.branch} has ${ahead} commit(s) of its own not pushed: they are the owner's to push` };
 
-    const titles = [];
+    const titles = [], nums = [];
     for (const e of statusEntries(root)) {
         const code = `${e.x}${e.y}`;
         const okCode = ["??", " M", "M ", "MM", "A ", "AM"].includes(code);
@@ -221,6 +247,7 @@ function planRepo(root, name, from) {
             if (secret) { p.left.push({ path: e.path, why: `held back by the secrets check: ${secret}` }); continue; }
             p.files.push({ path: e.path, kind, sha256: sha256(join(root, e.path)) });
             titles.push(kind === "handoff" ? titleOfHandoff(root, e.path) : titleOfTodos(added));
+            if (added) nums.push(...todoNumbers(added));
         } else {
             if (isStaged(e)) p.blocked = `${e.path} is staged and is not a handoff`;
             p.left.push({ path: e.path, why: `${why}; left for ${name}'s own session` });
@@ -234,6 +261,7 @@ function planRepo(root, name, from) {
     let subject = `Handoff from ${from.name}: ${titles.join("; ")}`;
     if (subject.length > 100) subject = `${subject.slice(0, 97).replace(/\s+\S*$/, "")}...`;
     p.message = subject;
+    if (p.files.length) p.noX = missingXRows(name, nums);
     return p;
 }
 
@@ -261,6 +289,7 @@ function printPlan(plan) {
             console.log(`   commit:  "${p.message}"`);
             for (const f of p.files) console.log(`            ${f.path}  (${f.kind}, ${f.sha256.slice(0, 12)})`);
         }
+        for (const x of p.noX ?? []) console.log(`   no X row for ${x} in aipmo's docs/cross-repo.md`);
         for (const l of p.left) console.log(`   left:    ${l.path}  - ${l.why}`);
     });
     const code = plan.repos.flatMap((p) => p.left.filter((l) => / own session$/.test(l.why)).map((l) => `${p.name}/${l.path}`));
@@ -387,6 +416,8 @@ function apply(plan, notifyOn) {
     renameSync(PLAN, join(STATE, "plan.applied.json"));
     console.log("\nxcnp applied:");
     results.forEach((r, n) => console.log(`${n + 1}. ${r}`));
+    const noX = plan.repos.flatMap((p) => p.noX ?? []);
+    if (noX.length) console.log(`\nno X row for ${noX.join(", ")}: add it to aipmo's docs/cross-repo.md (xcnp doesn't write it)`);
     const left = plan.repos.flatMap((p) => p.left.map((l) => `${p.name}/${l.path}`));
     if (left.length) console.log(`\nStill uncommitted, as planned: ${left.join(", ")}`);
     return failed ? 1 : 0;

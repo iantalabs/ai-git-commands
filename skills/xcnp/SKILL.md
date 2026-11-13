@@ -27,6 +27,10 @@ a repo line as a handoff, and the owner's own `cnp`/`cpr` commits and ships it. 
 the list but staged, a branch with unpushed commits of its own, a detached HEAD, or a repo
 outside `~/workspace/iantalabs` and aipmo's `portfolio.yml` stops that repo.
 
+It also reads aipmo's `docs/cross-repo.md`: for each todo it commits (the repo, for a handoff
+alone) that no X row cites, the plan and the report say `no X row for <repo> #N`. It never
+writes the row; aipmo is the session's to edit, as the log is.
+
 ## Steps
 
 1. **Name the repos** this session wrote into: from the conversation, and `git -C <repo>
@@ -44,7 +48,8 @@ outside `~/workspace/iantalabs` and aipmo's `portfolio.yml` stops that repo.
    then `mini`, posts a notice in the repo's Matrix room, and adds a row to aipmo's
    `docs/cross-repo-log.md`, committed there.
 5. **Report**, numbered, what `xcnp` printed: each repo's short SHA, message and where it went,
-   each refusal and why, the log commit; then what was left in each repo, so the operator
+   each refusal and why, the log commit, each `no X row for <repo> #N` line (tell the session
+   to add that row to aipmo's `docs/cross-repo.md`); then what was left in each repo, so the operator
    knows what waits for whose session.
 
 `xcnp <repo>…` without `--plan` plans and applies in one go; use it when the user has already

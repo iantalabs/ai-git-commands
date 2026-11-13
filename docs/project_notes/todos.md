@@ -17,7 +17,7 @@ peak fraction of a ~200k-token window. **The matrix holds open items only**; a d
 | Pri | St  | #   | Item                                                       | Effort | Tokens    | Context | Pairing and notes |
 | --- | --- | --- | ---------------------------------------------------------- | ------ | --------- | ------- | ----------------- |
 | P2  | 🔨  | 1   | `xcnp`: commit a session's handoffs in other repos, safely | ~2h    | ~150–250k | ~25%    | Built 2026-11-10 on STD and tested in a sandbox (see the section). Left: M16 install, and the first real handoff (vsum → aipmo) with its Matrix notice and no prompt. Touches `skills/cnp`; aipmo #22 keeps its log |
-| P2  | 📋  | 2   | `cnp` names the X a commit closes                          | ~1h    | ~60–100k  | ~15%    | X9. From aipmo, 2026-11-13 (aipmo #22); + #1 (`xcnp` gets the reminder) |
+| P2  | 🔨  | 2   | `cnp` names the X a commit closes                          | ~1h    | ~60–100k  | ~15%    | X9. Built 2026-11-13: `cnp` step 3, `xcnp` "no X row" line. Left: the operator checks a live commit naming an X. From aipmo (#22); + #1 |
 
 ## Closed
 

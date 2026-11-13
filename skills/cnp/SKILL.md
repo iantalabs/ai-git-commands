@@ -47,6 +47,9 @@ This file lives in git at `ai-git-commands/skills/cnp/SKILL.md` and is symlinked
    3. the headings of new docs in the diff
    4. what this session did, from the conversation; for a change it didn't make, what
       the diff itself shows (`git diff`, `git log -3 -- <path>`)
+   When a todo row in the diff cites an X (`X3`, a row in aipmo's `docs/cross-repo.md`) and
+   its status changes, the subject names it: `… (closes X3's aipmo side)`, or `(X3 done)`
+   when both sides are done. Draft it the way struck and changed todo rows are.
 4. **Write it in the repo's style**, from `git log`: a subject that reads as a sentence
    and a body on *why*, where the log does that; a repo whose log is terse gets a terse
    message. End with the co-author line the harness gives. Split into several commits
