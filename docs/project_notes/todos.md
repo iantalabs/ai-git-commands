@@ -17,6 +17,7 @@ peak fraction of a ~200k-token window. **The matrix holds open items only**; a d
 | Pri | St  | #   | Item                                                       | Effort | Tokens    | Context | Pairing and notes |
 | --- | --- | --- | ---------------------------------------------------------- | ------ | --------- | ------- | ----------------- |
 | P2  | 🔨  | 1   | `xcnp`: commit a session's handoffs in other repos, safely | ~2h    | ~150–250k | ~25%    | Built 2026-11-10 on STD and tested in a sandbox (see the section). Left: M16 install, and the first real handoff (vsum → aipmo) with its Matrix notice and no prompt. Touches `skills/cnp`; aipmo #22 keeps its log |
+| P2  | 📋  | 2   | `cnp` names the X a commit closes                          | ~1h    | ~60–100k  | ~15%    | X9. From aipmo, 2026-11-13 (aipmo #22); + #1 (`xcnp` gets the reminder) |
 
 ## Closed
 
@@ -95,3 +96,19 @@ below, which needs a real handoff.
 a code file changed beside it is named and left; `--apply` commits and pushes it with no
 permission prompt, the notice appears in aipmo's room and the log has its line; a file edited
 between plan and apply is refused.
+
+## #2 — `cnp` names the X a commit closes
+
+**From aipmo** (2026-11-13, aipmo todo #22, cross-repo row X9): work one repo needs from another
+now has one table, [aipmo/docs/cross-repo.md](../../../iantalabs/aipmo/docs/cross-repo.md), an
+X-numbered row each, cited from both repos' todo rows (`X3`). Two parts of the rule are in these
+skills:
+
+1. **`cnp`, step 3:** when a todo row in the diff cites an X (`X3`) and its status changes, the
+   message names it: `… (closes X3's aipmo side)`, or `(X3 done)` when both sides are. Drafted the
+   way struck and changed todo rows are today.
+2. **`xcnp`:** when it commits a handoff or an added todo row into another repo, it checks that
+   aipmo's table has a row for it, and if not says so in its report: "no X row for <repo> #N".
+   It doesn't write the row itself; aipmo is the session's to edit, as the log is.
+
+**Done when** both skills say so, and one commit has named an X.
