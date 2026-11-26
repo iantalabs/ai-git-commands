@@ -37,9 +37,13 @@ in `~/.claude`.
    - **angel** builds once here and sends the same app over ssh; its version is in the
      app's footer. `cpr all` also redeploys the iPhone and Watch: drop
      `--skip-phone --skip-watch`.
-   - **ncol** builds the wall on each Mac from its own checkout (the other Mac pulls
-     `--ff-only`), restarts the LaunchAgent only when the server's code changed, and asks
-     each Mac's `:8080` for `/modules/version.json`. Its version is in the wall's tab title.
+   - **ncol** builds the wall on each Mac from its own checkout, restarts the LaunchAgent only
+     when the server's code changed, and asks each Mac's `:8080` for `/modules/version.json`.
+     Its version is in the wall's tab title. The other Mac doesn't pull from GitHub: this Mac
+     pushes HEAD over the ssh into that checkout's `origin/main` and it fast-forwards
+     (ncol #79), because its GitHub key's passphrase is in a keychain that locks while nobody
+     is at it. The log says "handing over <sha>"; it pulls from GitHub only when the commit
+     didn't arrive.
    - **mural** runs from each Mac's own checkout: the other Mac pulls `--ff-only`, and each
      rebuilds and reopens its menu bar app (`~/Applications/Mural.app`), stamped with the
      commit it reports (shown in the menu). Open mural pages reload when page code changed;
@@ -58,6 +62,10 @@ in `~/.claude`.
      plain `cnp`; say there is no redeploy for it.
 3. **If the redeploy fails**, the commit is still pushed. Show the failing lines from the
    script's output and its log path, and stop. Don't retry by hand over ssh.
+   **The other Mac "unreachable"** means neither route answered: the scripts' `-ts` alias
+   already tries the LAN first and falls back to the tailnet (each Mac's `~/.ssh/config`,
+   aipmo.md §5 rule 6). Check that block is there (`ssh -G m16-ts | grep ^hostname` says
+   `m16.local` at home) before blaming Tailscale.
 
 ## Report
 
